@@ -28,7 +28,6 @@ ProAuth AI is a full-stack healthcare prior-authorization platform that combines
 15. [Project Structure](#project-structure)
 16. [Deployment](#deployment)
 17. [Testing](#testing)
-18. [Known Limitations](#known-limitations)
 
 ---
 
