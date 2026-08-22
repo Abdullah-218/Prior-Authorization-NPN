@@ -1,0 +1,6 @@
+# Test-only dependencies — NOT installed in the production image (see
+# ../.dockerignore, which already excludes tests/ from what gets shipped).
+# Kept separate from requirements.txt so a production install never pulls
+# test tooling it will never use.
+-r requirements.txt
+pytest==9.1.1

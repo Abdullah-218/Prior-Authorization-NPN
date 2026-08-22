@@ -1,0 +1,56 @@
+# Ingestion + agent-pipeline + HTTP-serving dependencies for the whole
+# policy-rag/ triage service (main.py), including its ml/ subpackage
+# (ml-triage/ was retired 2026-08-19+ — see ml/model.py). sentence-transformers
+# pulls in torch, which the old serve/requirements.txt deliberately avoided
+# by staying separate — but retrieve_policy_evidence() embeds every query
+# at request time (see retrieval.py), not just during ingestion, so this
+# service needs it either way; there's no lighter split left to make.
+requests==2.32.3
+psycopg2-binary==2.9.9
+pgvector==0.3.0
+sentence-transformers==3.3.1
+python-dotenv==1.0.1
+groq==0.13.1
+langgraph==1.2.11
+langgraph-checkpoint-mongodb==0.4.0
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+# Pinned to match the version ml/models/proauth_best_model.pkl was
+# actually trained with. CORRECTION (2026-08-20): a prior pass here
+# briefly re-pinned this to 1.9.0 on the mistaken assumption that matching
+# requirements.txt to the (drifted) installed version would silence
+# sklearn's InconsistentVersionWarning. Verified empirically that it does
+# not — the warning compares the runtime sklearn version against the
+# version *embedded in the pickle at save time* (1.8.0), which a
+# requirements.txt edit can never change. Reverted to 1.8.0 and reinstalled
+# it into the venv instead (see terminal history) — zero-risk fix, since it
+# makes the runtime match what the artifact was actually trained with,
+# rather than risking a subtly different predict_proba() from retraining
+# or running a newer sklearn than the artifact was validated against.
+scikit-learn==1.8.0
+# ml/model.py builds a named-column DataFrame for the model (the artifact
+# expects feature_names_in_, not a bare positional array).
+pandas==3.0.5
+# Document Agent OCR — local Tesseract only, no document content leaves
+# this machine. pdf2image shells out to the locally-installed poppler
+# (pdftoppm) to rasterize PDF pages before OCR; Pillow already comes in
+# transitively via sentence-transformers but is listed explicitly since
+# document_ocr.py imports it directly.
+pytesseract==0.3.13
+pdf2image==1.17.0
+# Already satisfied transitively via sentence-transformers at 12.3.0 in
+# this environment — listed explicitly since document_ocr.py imports it
+# directly, pinned to what's actually installed rather than forcing a
+# downgrade.
+Pillow==12.3.0
+# priority_intelligence/ (2026-08-21+, mounted as a router on this same
+# app in main.py) — the nurse-queue priority ranker's XGBRanker artifact.
+# joblib is also already satisfied transitively via scikit-learn, but
+# listed explicitly since ranker.py imports it directly. IMPORTANT: this
+# model must be loaded before sentence-transformers/torch initializes in
+# the process (see main.py's import order and priority_intelligence/
+# README.md's "known issue" section) — loading it after causes a SIGSEGV,
+# a real macOS conflict between XGBoost's and PyTorch's bundled OpenMP
+# runtimes, not a version-pinning issue this pin can fix on its own.
+xgboost==3.2.0
+joblib==1.5.3

@@ -1,0 +1,24 @@
+{
+  "features": [
+    "policy_score",
+    "documentation_score",
+    "clinical_evidence_score",
+    "num_criteria_missing",
+    "hours_pending",
+    "sla_pressure",
+    "urgency_weight",
+    "care_setting_weight",
+    "clinical_risk_weight"
+  ],
+  "metrics": {
+    "train_ndcg@5": 0.9915693613528295,
+    "val_ndcg@5": 0.9848298238397133,
+    "test_ndcg@5": 0.9828484240083583,
+    "pend_cases": 3185,
+    "pend_patients": 2028
+  },
+  "label": "relevance_label (0-5 bins from priority proxy)",
+  "label_source": "priority_proxy + Gaussian noise; prototype only",
+  "source_filter": "outcome == 'PEND' ONLY",
+  "random_state": 42
+}

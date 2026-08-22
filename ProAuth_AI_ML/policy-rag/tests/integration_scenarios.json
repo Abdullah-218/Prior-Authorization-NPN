@@ -1,0 +1,112 @@
+[
+  {
+    "id": "bariatric_approve",
+    "description": "Aetna bariatric surgery, full clinical evidence + documents submitted — should reach the ML model and APPROVE",
+    "request": {
+      "requestedService": "bariatric surgery",
+      "diagnosis": "morbid obesity with type 2 diabetes",
+      "planId": "PLAN005",
+      "icd10Code": "E66.01",
+      "clinicalJustification": "Patient is a 45-year-old female with BMI of 42 kg/m^2 and a 5-year history of type 2 diabetes mellitus. She has completed a 6-month physician-supervised weight management program including dietary changes and increased physical activity, without achieving sustained weight loss.",
+      "providerSpecialty": "bariatric surgery",
+      "documentEvidence": {
+        "documentationScore": 100.0,
+        "nRequiredDocuments": 2,
+        "nDocumentsSubmitted": 2,
+        "missingDocuments": [],
+        "relevantDocuments": ["clinical notes", "prescription"]
+      },
+      "requestContext": { "urgency": "routine", "patient_age": 45 }
+    },
+    "expectedOutcome": "APPROVE",
+    "expectedGates": { "missingRequiredEvidence": false, "policyNotFound": false, "coverageNotCovered": false },
+    "notes": "Live-verified 2026-08-20 at 99.3%/97.5%/97.5% confidence across 3 separate runs. Real Groq calls, real ML model invocation."
+  },
+  {
+    "id": "bariatric_no_facts_pend",
+    "description": "Aetna bariatric surgery, zero clinical facts given — should PEND via indicationMismatchFlagged, not reach the model",
+    "request": {
+      "requestedService": "bariatric surgery",
+      "diagnosis": "morbid obesity",
+      "planId": "PLAN005",
+      "patientFacts": {},
+      "requestContext": { "urgency": "routine" }
+    },
+    "expectedOutcome": "PEND",
+    "expectedGates": { "indicationMismatchFlagged": true },
+    "notes": "Live-verified 2026-08-20. Clinical Agent under-extracts by design (absence != false); all named criteria FAIL, diagnosisSupported: false."
+  },
+  {
+    "id": "liposuction_real_exclusion",
+    "description": "Aetna liposuction — a real, RAG-retrieved policy exclusion (coverageStatus: NOT_COVERED)",
+    "request": {
+      "requestedService": "liposuction",
+      "diagnosis": "excess adiposity",
+      "planId": "PLAN005",
+      "patientFacts": {},
+      "requestContext": { "urgency": "routine" }
+    },
+    "expectedOutcome": "PEND",
+    "expectedGates": { "coverageNotCovered": true, "indicationMismatchFlagged": true },
+    "notes": "Live-verified 2026-08-20, both before and after the coverageNotCovered gate (item #36) was added — both gates independently fire on this real exclusion (AETNA-BARIATRIC-0157's experimental/investigational section)."
+  },
+  {
+    "id": "ldct_lung_screening_approve",
+    "description": "Medicare low-dose CT lung cancer screening, full evidence — should APPROVE",
+    "request": {
+      "requestedService": "low dose CT lung cancer screening",
+      "diagnosis": "high risk for lung cancer, tobacco use",
+      "planId": "PLAN001",
+      "icd10Code": "Z87.891",
+      "clinicalJustification": "Patient is a 61-year-old current smoker with a 30 pack-year smoking history, asymptomatic for lung cancer. An order for low-dose CT lung cancer screening has been placed, and the required shared decision-making counseling visit was completed and documented prior to this order.",
+      "documentEvidence": {
+        "documentationScore": 100.0,
+        "nRequiredDocuments": 1,
+        "nDocumentsSubmitted": 1,
+        "missingDocuments": [],
+        "relevantDocuments": ["clinical notes"]
+      },
+      "requestContext": { "urgency": "routine", "patient_age": 61 }
+    },
+    "expectedOutcome": "APPROVE",
+    "expectedGates": { "missingRequiredEvidence": false },
+    "notes": "Live-verified 2026-08-20 at 99.1% confidence. All 9 applicable criteria PASSed. This is also the slowest observed real call (96.2s) — the case that motivated raising triageService.js's timeout from 60s to 120s."
+  },
+  {
+    "id": "no_policy_metformin_medicare",
+    "description": "Medicare + plain Metformin — no matching policy in the corpus (realistic: Metformin rarely needs PA). Regression test for item #35.",
+    "request": {
+      "requestedService": "Metformin",
+      "diagnosis": "Type 2 diabetes mellitus",
+      "planId": "PLAN001",
+      "icd10Code": "E11.9",
+      "clinicalJustification": "Patient with Type 2 diabetes with HbA1c above target despite lifestyle modification, requires pharmacologic therapy per ADA guidelines. Previous treatment attempted: Yes. Previous treatment/medication: Diet and exercise. Response to previous treatment: Insufficient response. Previous treatment failed: Yes.",
+      "providerSpecialty": "Endocrinology",
+      "documentEvidence": {
+        "documentationScore": 100.0,
+        "nRequiredDocuments": 4,
+        "nDocumentsSubmitted": 4,
+        "missingDocuments": [],
+        "relevantDocuments": ["clinical notes", "lab reports", "prescription", "previous treatment records"]
+      },
+      "requestContext": { "urgency": "routine", "patient_age": 23 }
+    },
+    "expectedOutcome": "PEND",
+    "expectedGates": { "policyNotFound": true },
+    "notes": "THE regression test for item #35 — before the fix, this same request auto-APPROVED at 91.1% confidence. Live-verified after the fix returns PEND across all 4 tested tiers (Medicare here; PLAN020/021/022 for Private Silver/Gold/Premium give the same result, adapted from sampletestcases.md Case 1 per user request 2026-08-20)."
+  },
+  {
+    "id": "bogus_plan_id_graceful_degradation",
+    "description": "Nonexistent insurance plan ID — must degrade gracefully, never crash or hallucinate a policy",
+    "request": {
+      "requestedService": "bariatric surgery",
+      "diagnosis": "morbid obesity",
+      "planId": "PLAN999",
+      "patientFacts": { "bmi": 42 },
+      "requestContext": { "urgency": "routine" }
+    },
+    "expectedOutcome": "PEND",
+    "expectedGates": { "policyNotFound": true },
+    "notes": "Live-verified 2026-08-20. Before item #35's fix this landed on MORE_INFORMATION via missingRequiredEvidence (no documents were attached in this scenario either); after the fix, policyNotFound is checked earlier and fires first with a more accurate reason. Either way: no crash, no hallucinated policy — this test's real assertion is graceful degradation, not the specific bucket."
+  }
+]

@@ -1,0 +1,30 @@
+WINNING MODEL: LogisticRegression
+Best params: {'model__C': np.float64(0.12742749857031335), 'model__penalty': 'l1'}
+Decision threshold (val-selected): 0.4530
+
+Train-only accuracy (display only): 84.80%
+Val-only accuracy (display only):    85.01%
+Test accuracy:                       85.07%
+Holdout-category accuracy:            82.89%
+
+=== Test classification report ===
+              precision    recall  f1-score   support
+
+        PEND       0.86      0.84      0.85       653
+     APPROVE       0.85      0.86      0.85       653
+
+    accuracy                           0.85      1306
+   macro avg       0.85      0.85      0.85      1306
+weighted avg       0.85      0.85      0.85      1306
+
+=== Holdout-category classification report (Spinal Cord Stimulator, unseen) ===
+              precision    recall  f1-score   support
+
+        PEND       0.87      0.77      0.82       339
+     APPROVE       0.79      0.89      0.84       339
+
+    accuracy                           0.83       678
+   macro avg       0.83      0.83      0.83       678
+weighted avg       0.83      0.83      0.83       678
+
+Meets >80% accuracy target on BOTH: True

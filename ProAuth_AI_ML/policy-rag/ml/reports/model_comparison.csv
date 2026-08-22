@@ -1,0 +1,3 @@
+model,cv_best_roc_auc,best_params,train_accuracy_pct,val_accuracy_pct,train_val_gap_pts,val_roc_auc,val_f1,verdict
+LogisticRegression,0.923,"{""model__C"": 0.12742749857031335, ""model__penalty"": ""l1""}",85.03,84.67,0.35,0.9213,0.8458,OK
+RandomForest,0.9205,"{""model__max_depth"": 6, ""model__min_samples_leaf"": 30, ""model__n_estimators"": 150}",85.25,84.51,0.74,0.9178,0.8457,OK

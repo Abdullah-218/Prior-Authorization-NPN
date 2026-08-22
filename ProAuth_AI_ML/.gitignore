@@ -1,0 +1,22 @@
+# Local-only credentials
+.env
+.env.*
+!.env.example
+
+# Groq key pool's rotation state (which pooled keys are exhausted today) —
+# local runtime state, not something to commit. See policy-rag/groq_key_pool.py.
+policy-rag/.groq_key_pool_state.json
+
+# Python
+**/__pycache__/
+*.pyc
+policy-rag/.venv/
+priority_intelligence/data
+
+.DS_Store
+**/.DS_Store
+
+.pytest_cache
+
+Dockerfile
+.dockerignore

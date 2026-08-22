@@ -1,0 +1,41 @@
+{
+  "model_name": "LogisticRegression",
+  "best_params": {
+    "model__C": 0.12742749857031335,
+    "model__penalty": "l1"
+  },
+  "decision_threshold": 0.45300000000000007,
+  "train_only_accuracy_pct": 84.8,
+  "val_only_accuracy_pct": 85.01,
+  "test_accuracy_pct": 85.07,
+  "test_roc_auc": 0.9369,
+  "holdout_accuracy_pct": 82.89,
+  "holdout_roc_auc": 0.9099,
+  "feature_importance": {
+    "clinical_evidence_score": 1.9211467061422651,
+    "policy_score": 1.19270081741304,
+    "documentation_score": 0.6776818036577552,
+    "diagnosis_supported": 0.0
+  },
+  "confusion_matrix_test": [
+    [
+      560,
+      93
+    ],
+    [
+      102,
+      551
+    ]
+  ],
+  "confusion_matrix_holdout": [
+    [
+      301,
+      38
+    ],
+    [
+      78,
+      261
+    ]
+  ],
+  "meets_80pct_accuracy_target": true
+}
