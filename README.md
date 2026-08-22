@@ -1,12 +1,11 @@
 # ProAuth AI
 
-**AI-assisted prior authorization for healthcare — evidence-grounded, gate-protected, and always reviewed by a human.**
+> **AI-assisted prior authorization for healthcare — evidence-grounded, policy-aware, explainable, and human-reviewed.**
 
-ProAuth AI automates the evidence-gathering and risk-triage steps of medical prior authorization (PA)
-requests, while keeping every approval, denial, and edge case under deterministic safety rules and
-final human review. It combines retrieval-augmented policy lookup, a small team of specialized
-agents, a trained decision model, and a priority-ranking system — wired into a real multi-role
-web application backed by PostgreSQL, MongoDB, and AWS.
+ProAuth AI automates the evidence-gathering and risk-triage steps of medical prior authorization (PA) requests, while keeping every approval, denial, and edge case under deterministic safety rules and final human review. It combines retrieval-augmented policy lookup, a small team of specialized agents, a trained decision model, and a priority-ranking system — wired into a real multi-role web application backed by PostgreSQL, MongoDB, and AWS.
+
+
+ProAuth AI is a full-stack healthcare prior-authorization platform that combines **RAG-based policy retrieval, specialized AI agents, machine-learning decision intelligence, pending-case prioritization, LangGraph orchestration, PostgreSQL/pgvector, MongoDB checkpointing, and a multi-role web application**.
 
 ---
 
@@ -15,342 +14,986 @@ web application backed by PostgreSQL, MongoDB, and AWS.
 1. [Problem Statement](#problem-statement)
 2. [Solution](#solution)
 3. [Objectives](#objectives)
-4. [Core Design Principle: Agents Gather Evidence, the Model Decides](#core-design-principle-agents-gather-evidence-the-model-decides)
+4. [Core Design Principle](#core-design-principle)
 5. [System Architecture](#system-architecture)
-6. [The Six-Agent Workflow](#the-six-agent-workflow)
-7. [Deterministic Safety Gates](#deterministic-safety-gates)
-8. [Policy Retrieval (RAG)](#policy-retrieval-rag)
-9. [The Decision Model](#the-decision-model)
-10. [Priority Intelligence (Queue Ranking)](#priority-intelligence-queue-ranking)
-11. [Data Security](#data-security)
-12. [Application Roles](#application-roles)
-13. [Tech Stack](#tech-stack)
-14. [Project Structure](#project-structure)
-15. [Database](#database)
-16. [Running Locally](#running-locally)
-17. [Deployment (AWS)](#deployment-aws)
-18. [Testing](#testing)
-19. [Known Limitations](#known-limitations)
+6. [End-to-End Workflow](#end-to-end-workflow)
+7. [Agentic Intelligence](#agentic-intelligence)
+8. [Policy Retrieval — RAG](#policy-retrieval--rag)
+9. [ML Decision Intelligence](#ml-decision-intelligence)
+10. [Priority Intelligence](#priority-intelligence)
+11. [Application Roles](#application-roles)
+12. [Data Architecture](#data-architecture)
+13. [Data Security](#data-security)
+14. [Technology Stack](#technology-stack)
+15. [Project Structure](#project-structure)
+16. [Deployment](#deployment)
+17. [Testing](#testing)
+18. [Known Limitations](#known-limitations)
 
 ---
 
-## Problem Statement
+# Problem Statement
 
-Prior authorization is the approval a health insurer requires before certain treatments, procedures,
-or medications are covered. In practice it is one of the most friction-heavy parts of the healthcare
-system:
+Prior authorization is the approval a health insurer requires before certain treatments, procedures, or medications are covered.
 
-- **Slow.** A request can sit for days waiting on a human reviewer to manually check it against a
-  payer's coverage policy, cross-reference clinical documentation, and decide.
-- **Inconsistent.** The same request can get different outcomes depending on which reviewer
-  handles it and how carefully they read the policy that day.
-- **Opaque.** Doctors and patients often get a denial with little explanation of which specific
-  policy criterion wasn't met or what evidence would fix it.
-- **Reviewer time is spent unevenly.** Every pending request waits in the same queue whether it's
-  routine and low-risk or clinically urgent — nothing surfaces the case that actually needs
-  attention first.
-- **Volume keeps growing** while clinical staff time doesn't scale with it.
+Traditional prior-authorization workflows can be:
 
-## Solution
+- **Slow** — requests may wait for manual policy and clinical review.
+- **Inconsistent** — outcomes can depend heavily on individual reviewer interpretation.
+- **Opaque** — providers and patients may not understand which criteria or evidence affected a request.
+- **Evidence-heavy** — reviewers must cross-reference policy requirements with clinical records and submitted documents.
+- **Difficult to prioritize** — pending cases may remain in submission order even when urgency or SLA pressure changes.
 
-ProAuth AI is a full-stack prior-authorization platform where a doctor submits a request and, within
-the same session, receives an evidence-grounded triage outcome — **Approve**, **Pend for human
-review**, or **More information needed** — instead of an opaque wait. Behind that outcome:
+ProAuth AI addresses these challenges by bringing policy retrieval, evidence extraction, structured evaluation, machine learning, and reviewer prioritization into a single workflow.
 
-- A **retrieval layer** grounds every decision in the *actual* payer policy text, not a model's
-  memorized guess at what a policy might say.
-- A small **team of specialized agents** each independently gather one kind of evidence (policy
-  coverage, clinical criteria, submitted documentation) so no single step is asked to do everything.
-- **Deterministic safety gates** — plain code, not a model — catch known-dangerous or
-  known-incomplete cases (drug contraindications, an inactive policy, a wrong specialty) and route
-  them straight to a human, *before* any model prediction is even computed.
-- A **trained classifier**, not an LLM, makes the actual approve/pend call for everything that
-  clears the gates — bounded, auditable, and reproducible in a way a raw LLM judgment isn't.
-- Every request that does land in a human queue is **automatically ranked by real urgency** — SLA
-  pressure, clinical risk, how long it's been waiting — instead of sitting in submission order.
-- The whole system runs behind **four real, role-specific applications** (Doctor, Nurse, Insurance
-  Admin, Patient), each seeing exactly the workflow and data relevant to them.
+---
 
-## Objectives
+# Solution
 
-- Cut the time between request submission and a defensible triage outcome from days to minutes for
-  the majority of cases.
-- Ground every automated recommendation in real, retrieved policy text and real submitted clinical
-  evidence — never a model's unverified claim about what a policy says.
-- Keep a human in the loop for every case that carries genuine ambiguity, risk, or missing
-  information, instead of ever fully automating a denial.
-- Give reviewers a queue that's ranked by actual urgency, not submission order.
-- Protect clinical and decision data at rest, not just in transit.
-- Make every automated decision explainable — which policy, which criteria, which evidence, in
-  plain language, not a black-box score.
+ProAuth AI provides an evidence-grounded prior-authorization pipeline.
 
-## Core Design Principle: Agents Gather Evidence, the Model Decides
+A doctor submits an authorization request with clinical information and supporting documents. The system then:
 
-This is the single most load-bearing architectural decision in the project: **the LLM-driven agents
-never decide the outcome of a request.** Their job is to retrieve, extract, and structure evidence.
-A separately trained classifier — with a fixed, bounded feature set and a calibrated decision
-threshold — is the only thing that ever outputs APPROVE or PEND on the criteria the model actually
-learned from. Deterministic code-level gates sit in front of the model entirely, so anything the
-gates already know is unsafe or incomplete never reaches the model at all.
+1. Identifies the applicable coverage policy.
+2. Retrieves relevant policy evidence using RAG.
+3. Extracts and evaluates clinical information.
+4. Checks required documentation.
+5. Assembles structured evidence and policy criteria.
+6. Uses the trained ML decision model for requests that reach model evaluation.
+7. Produces an explainable recommendation:
+   - **APPROVE**
+   - **PEND**
+   - **MORE INFORMATION**
+8. Sends pending cases to a separate priority-intelligence pipeline.
+9. Ranks pending cases for nurses using an XGBoost ranking model.
+10. Provides human reviewers with evidence, reasoning, policy context, and prioritization information.
 
-This separation exists on purpose: an LLM's judgment is fluent but not bounded or auditable in the
-way a trained model's decision boundary is; letting an agent's prose reasoning silently become the
-actual approve/deny call would make every decision unrepeatable and hard to defend. Every agent in
-this system produces *evidence*. Only the model and the deterministic gates produce a *decision*.
+The goal is not to replace clinical or insurance reviewers. The goal is to reduce repetitive evidence-gathering work and make human review faster, more consistent, and more explainable.
 
-## System Architecture
+---
 
-```
-┌───────────────────────┐        ┌────────────────────────┐        ┌──────────────────────────────────┐
-│   React Frontend        │       │   Node.js / Express API  │       │   Python Triage Service (FastAPI)  │
-│                          │       │                          │       │                                    │
-│  Doctor · Nurse ·        │◄─────►│  Auth · Authorizations   │◄─────►│  LangGraph orchestration           │
-│  Insurance Admin ·       │  REST │  Documents · Review      │ REST  │  RAG retrieval + 5 agents           │
-│  Patient (read-only)     │       │  Priority · Audit        │       │  Deterministic safety gates         │
-└───────────────────────┘        └────────────┬─────────────┘        │  Trained decision model             │
-                                                │                       │  Companion (explanation) agent      │
-                                                │                       └───────────────┬────────────────────┘
-                                  ┌─────────────┴─────────────┐                         │
-                                  │   PostgreSQL 17 + pgvector  │◄────────────────────────┘
-                                  │                              │        (policy corpus + embeddings,
-                                  │   Clinical & decision JSONB   │         shared with the Node backend)
-                                  │   columns encrypted at rest   │
-                                  │   (AES-256-GCM)                │
-                                  └───────────────────────────────┘
+# Objectives
 
-                                  ┌───────────────────────────────┐        ┌─────────────────────────────┐
-                                  │   MongoDB Atlas                 │       │  Priority Intelligence       │
-                                  │   LangGraph checkpoint state     │       │  Service (XGBoost ranker)    │
-                                  │   (per-request evidence trail,   │       │  Ranks the human review      │
-                                  │    resubmission memoization)     │       │  queue by real urgency       │
-                                  └───────────────────────────────┘        └─────────────────────────────┘
+- Reduce the time required to evaluate prior-authorization requests.
+- Ground authorization evaluation in actual payer policy evidence.
+- Separate evidence gathering from final ML decision intelligence.
+- Make recommendations explainable and auditable.
+- Identify missing clinical or administrative evidence.
+- Prioritize pending cases according to urgency, clinical risk, and SLA pressure.
+- Maintain a human-review workflow for cases requiring manual attention.
+- Protect sensitive clinical and decision data.
+- Provide separate interfaces for doctors, nurses, insurance administrators, and patients.
+
+---
+
+# Core Design Principle
+
+## Agents Gather Evidence. Models Provide Intelligence.
+
+ProAuth AI deliberately separates **evidence gathering**, **orchestration**, and **machine-learning decisions**.
+
+AI agents are responsible for tasks such as:
+
+- Retrieving policy evidence.
+- Extracting clinical facts.
+- Evaluating policy criteria.
+- Producing explanations.
+- Coordinating queue prioritization.
+
+The ML models operate on structured numerical features produced by these stages.
+
+```text
+Policy Evidence
+      +
+Clinical Evidence
+      +
+Documentation Evidence
+      +
+Structured Reasoning
+      ↓
+Machine Learning
+      ↓
+Authorization Recommendation
 ```
 
-Deployed on AWS via ECS Fargate (one service each for frontend/backend/ML), a shared Application
-Load Balancer, RDS for PostgreSQL, and S3 for model artifacts — provisioned through AWS Copilot.
+For pending requests:
 
-## The Six-Agent Workflow
-
-A submitted request runs through six named agents across two services. Three call Groq (LLM
-tool-calling / extraction); three are deterministic code, deliberately not LLM calls, even though
-they're architecturally agents/graph nodes in their own right.
-
-| # | Agent | Service | Calls an LLM? | Role |
-|---|---|---|---|---|
-| 1 | **Policy Evidence Agent** | Triage (LangGraph) | Yes (Groq, real tool-calling) | Retrieves the applicable payer policy via RAG, extracts its coverage status and named clinical criteria — grounded only in what retrieval actually returns, never the model's own medical knowledge |
-| 2 | **Clinical Evidence Agent** | Triage (LangGraph) | Yes (Groq) | Extracts structured clinical facts from the doctor's diagnosis, ICD-10 code, and free-text justification; then scores those facts against the policy's named criteria (diagnosis-supported, per-criterion pass/fail) |
-| 3 | **Document Agent** | Triage (LangGraph) | No — deterministic | Checks which required document types (clinical notes, prescription) were actually submitted; reports policy-named optional documents as informational context, never blocking |
-| 4 | **Coverage Reasoning Agent** | Triage (LangGraph) | No — deterministic aggregator | Combines policy + clinical + document evidence into the model's feature vector and evaluates all nine safety gates, in priority order, *before* the model ever runs |
-| 5 | **Companion Agent** | Triage (post-decision) | Yes (Groq) | Runs only *after* a decision already exists — writes the plain-language explanation citing the real evidence. Never re-evaluates or second-guesses the decision it's given |
-| 6 | **Priority Agent** | Priority Intelligence (separate LangGraph) | No — deterministic orchestrator | Validates a newly-PEND case, invokes feature computation and the XGBoost ranking model, and applies the safety-floor overrides that produce the reviewer's ranked queue |
-
-**Triage graph topology** (agents 1–4, real LangGraph edges):
-
-```
-        ┌────────────────────┐
-   ┌───►│  Policy Evidence     │───────────────┐
-   │    │  Agent (RAG + Groq)  │               │
- START  └────────────────────┘               ▼
-   │                                  ┌──────────────────┐
-   │    ┌────────────────────┐        │  Document Agent    │
-   └───►│  Clinical Evidence   │───┐   │  (deterministic)   │
-        │  Agent (Groq)        │   │   └─────────┬─────────┘
-        └────────────────────┘   ▼             │
-                          ┌────────────────┐    │
-                          │ Clinical        │    │
-                          │ Criteria Eval    │    │
-                          │ (Groq)           │    │
-                          └────────┬────────┘    │
-                                   └───────┬──────┘
-                                           ▼
-                                ┌──────────────────────┐
-                                │  Coverage Reasoning     │
-                                │  Agent — 9 safety gates │
-                                └───────────┬───────────┘
-                                            ▼
-                                           END
-                          (ML decision model + Companion Agent run
-                           sequentially after the graph completes)
+```text
+Pending Case
+      ↓
+Queue Features
+      ↓
+XGBoost Ranking Model
+      ↓
+Safety-aware Priority Score
+      ↓
+Nurse Review Queue
 ```
 
-Policy Evidence and Clinical Evidence run in parallel from the start (independent inputs); Clinical
-Criteria Evaluation waits on both; Document Evidence only needs the policy's named requirements;
-Coverage Reasoning waits on both branches before evaluating the gates and building the model's
-feature vector.
+---
 
-## Deterministic Safety Gates
+# System Architecture
 
-Nine gates run, in this exact priority order, before the trained model ever sees a request. Any gate
-that fires routes the request straight to a human reviewer — the model is never invoked, and its
-confidence is reported as `null` (not a low score — a real "the model didn't run" signal).
+```text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         PROAUTH AI PLATFORM                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
 
-| # | Gate | Outcome |
-|---|---|---|
-| 1 | Contraindication flagged | PEND |
-| 2 | Policy inactive | PEND |
-| 3 | Coverage explicitly not covered | PEND |
-| 4 | Indication mismatch (diagnosis doesn't support the request) | PEND |
-| 5 | Policy not found | PEND |
-| 6 | Required evidence missing (no clinical notes / prescription submitted) | MORE INFORMATION |
-| 7 | Clinical evidence insufficient (majority of named criteria fail) | MORE INFORMATION |
-| 8 | Urgency flagged | PEND |
-| 9 | Specialty mismatch | PEND |
+                         USER APPLICATIONS
+┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐  ┌───────────┐
+│      DOCTOR      │  │      NURSE       │  │ INSURANCE ADMIN  │  │  PATIENT  │
+│                  │  │                  │  │                  │  │           │
+│ Submit PA        │  │ Review Queue     │  │ Analytics        │  │ View PA   │
+│ Upload Evidence  │  │ Prioritize Cases │  │ Policy Explorer  │  │ Status    │
+│ Track Requests   │  │ Review Evidence  │  │ Audit Trail      │  │ Documents │
+└────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘  └─────┬─────┘
+         │                     │                     │                  │
+         └─────────────────────┴─────────────────────┴──────────────────┘
+                                       │
+                                  REST APIs
+                                       │
+                         ┌─────────────▼─────────────┐
+                         │    NODE.JS / EXPRESS      │
+                         │                           │
+                         │ Auth · Authorizations     │
+                         │ Documents · Reviews       │
+                         │ Queue · Audit · Analytics  │
+                         └─────────────┬─────────────┘
+                                       │
+                              ┌────────▼────────┐
+                              │  PYTHON TRIAGE  │
+                              │    FASTAPI      │
+                              └────────┬─────────┘
+                                       │
+                              ┌────────▼─────────┐
+                              │    LANGGRAPH     │
+                              │  ORCHESTRATION   │
+                              └────────┬─────────┘
+                                       │
+              ┌────────────────────────┼─────────────────────────┐
+              │                        │                         │
+      ┌───────▼───────┐      ┌────────▼────────┐      ┌────────▼────────┐
+      │  POLICY/RAG   │      │ CLINICAL AGENT  │      │ DOCUMENT AGENT  │
+      │   EVIDENCE    │      │                 │      │                 │
+      └───────┬───────┘      └────────┬────────┘      └────────┬────────┘
+              │                       │                        │
+              └───────────────────────┼────────────────────────┘
+                                      │
+                              ┌───────▼────────┐
+                              │    REASONING   │
+                              │    ASSEMBLY    │
+                              └───────┬────────┘
+                                      │
+                              ┌───────▼────────┐
+                              │  ML DECISION   │
+                              │    MODEL       │
+                              └───────┬────────┘
+                                      │
+                              APPROVE / PEND /
+                              MORE INFORMATION
+                                      │
+                                      ▼
+                              ┌───────────────┐
+                              │   COMPANION   │
+                              │   EXPLANATION │
+                              └───────────────┘
 
-Only a request that clears all nine gates reaches the trained decision model.
 
-## Policy Retrieval (RAG)
+                    POLICY EVIDENCE STORAGE
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ PostgreSQL 17 + pgvector                                                    │
+│                                                                             │
+│ Structured application data + policy corpus + vector embeddings             │
+└─────────────────────────────────────────────────────────────────────────────┘
 
-- **Vector store:** PostgreSQL + `pgvector` — the same database the rest of the app uses, not a
-  separate vector database.
-- **Embedding model:** `sentence-transformers/all-MiniLM-L6-v2` (384-dimensional).
-- **Retrieval:** two-stage cosine-distance search, deterministically scoped to the patient's actual
-  payer before any semantic search runs — a Commercial-plan patient's request can never retrieve a
-  Medicare-only policy.
-- **Confidence bands:** HIGH ≤ 0.35 cosine distance, MEDIUM ≤ 0.50, otherwise LOW/not found. This
-  confidence is a hard backstop on `policyFound` — the retrieving agent's own LLM answer can never
-  override what the actual retrieved distance says.
+                    AGENT STATE / CHECKPOINTING
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ MongoDB Atlas                                                               │
+│                                                                             │
+│ LangGraph checkpoints · request context · resubmission state · thread state │
+└─────────────────────────────────────────────────────────────────────────────┘
 
-## The Decision Model
 
-- **Type:** Logistic Regression (scikit-learn `Pipeline` with standardization), not an LLM.
-- **Features (exactly four, fixed):** `policy_score`, `documentation_score`,
-  `clinical_evidence_score`, `diagnosis_supported`.
-- **Decision threshold:** cost-weighted (false-approve penalized 3× a false-pend), calibrated at
-  **0.7305** — recalibrated from a naive 0.5 cutoff specifically to reduce false approvals, the
-  costlier error class for a coverage decision.
-- **Output:** `APPROVE` or `PEND`, with a real confidence score. A gate-routed PEND always reports
-  `confidence: null` so the UI and audit trail can never conflate "the model was uncertain" with "the
-  model never ran."
+                    PENDING QUEUE INTELLIGENCE
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Priority Intelligence Service                                               │
+│                                                                             │
+│ LangGraph Priority Agent → Feature Computation → XGBoost Ranker             │
+│ → Safety-aware ranking → Nurse Queue                                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
-## Priority Intelligence (Queue Ranking)
+---
 
-A separate service ranks every PEND case in the human review queue — it does not re-decide anything,
-it orders what a reviewer sees first.
+# End-to-End Workflow
 
-- **Model:** XGBoost ranker (`rank:ndcg`), not the same model as the decision classifier.
-- **Nine features:** four reused directly from the original triage evaluation
-  (`policy_score`, `documentation_score`, `clinical_evidence_score`, `num_criteria_missing`) plus
-  five computed fresh from live queue state (`hours_pending`, `sla_pressure`, `urgency_weight`,
-  `care_setting_weight`, `clinical_risk_weight`).
-- **Safety-floor overrides** — deterministic, not learned — guarantee a minimum priority score
-  regardless of what the ranker predicts: **emergency ≥ 90**, **SLA breached ≥ 88**,
-  **SLA breach imminent ≥ 80**.
-- **Tiers:** HIGH ≥ 70, MEDIUM ≥ 20, otherwise LOW.
-- **Re-ranking:** the same model is simply re-invoked with fresh inputs whenever a new case enters
-  the queue or enough time passes that `hours_pending`/`sla_pressure` change — it is not
-  continuously retrained.
+## 1. Authorization Submission
 
-## Data Security
+A doctor submits:
 
-Clinical content and AI decision detail are encrypted at rest with **AES-256-GCM**, applied
-transparently at the application layer (Sequelize model getters/setters) so every existing route and
-the entire frontend read and write plain JSON exactly as before — the database, not the application
-code, is what changed.
+- Patient information
+- Diagnosis / ICD-10 information
+- Requested treatment or procedure
+- Clinical justification
+- Provider information
+- Insurance information
+- Treatment urgency
+- Place of service
+- Supporting documents
 
-**Encrypted:** `authorizations.{clinical, treatment, previousTreatment, justification,
-currentMedications}` and `triage_evaluations.{decision, clinicalEvidence, clinicalCriteriaEval,
-explanation, mlFeatures, diagnosis}` — the diagnosis, ICD-10 codes, free-text clinical justification,
-and the AI's full decision/evidence trail.
+The authorization is stored in PostgreSQL.
 
-**Deliberately left plaintext:** row-level access-control columns (`patientId`, `createdBy`),
-reviewer/queue columns (`status`, `reviewedBy`, `decisionSource`), and general identity/insurance
-JSONB (`patient`, `provider`, `insurance`) — administrative data, not clinical content, and in several
-cases the exact columns row-level access control depends on staying queryable.
+## 2. Policy Identification
 
-Additional layers: RDS storage encryption (provisioned at the infrastructure level), TLS in transit
-to the database, and bcrypt-hashed credentials with JWT session tokens. Encryption at rest narrows
-one specific risk — database or disk compromise — and does not by itself constitute full regulatory
-compliance; see [Known Limitations](#known-limitations).
+The Policy Evidence Agent determines which coverage policy applies to the request.
 
-## Application Roles
+The policy becomes the central source of truth for downstream evaluation.
 
-| Role | What they do |
+```text
+Authorization
+      ↓
+Policy Identification
+      ↓
+Applicable Policy
+```
+
+## 3. RAG Policy Retrieval
+
+The RAG layer searches the policy corpus stored in PostgreSQL with pgvector.
+
+```text
+Policy Documents
+      ↓
+Text Chunking
+      ↓
+Embedding Model
+      ↓
+Vector Embeddings
+      ↓
+PostgreSQL + pgvector
+      ↓
+Semantic Similarity Search
+      ↓
+Relevant Policy Chunks
+```
+
+Retrieved evidence is passed to the Policy Evidence Agent.
+
+## 4. Clinical and Documentation Evaluation
+
+The Clinical Evidence Agent extracts clinical facts and evaluates them against the policy criteria.
+
+The Document Agent checks which required document types are available.
+
+## 5. Structured Reasoning
+
+The Coverage Reasoning Agent combines policy, clinical, and documentation evidence into the structured feature representation required by the ML model.
+
+## 6. ML Decision
+
+The Logistic Regression model evaluates requests that reach model evaluation and produces the authorization recommendation and confidence.
+
+## 7. Explanation
+
+The Companion Agent generates a human-readable explanation from the already-established evidence and decision.
+
+## 8. Pending Queue
+
+When a request is `PEND`, it enters the separate Priority Intelligence pipeline.
+
+```text
+PEND
+ ↓
+Priority Agent
+ ↓
+Queue Features
+ ↓
+XGBoost Ranker
+ ↓
+Priority Score
+ ↓
+Nurse Queue
+```
+
+---
+
+# Agentic Intelligence
+
+| Agent | Purpose | LLM | Main Responsibility |
+|---|---|---:|---|
+| **Policy Evidence Agent** | Policy intelligence | Yes | Retrieves and interprets policy evidence |
+| **Clinical Evidence Agent** | Clinical intelligence | Yes | Extracts clinical facts and evaluates policy criteria |
+| **Document Agent** | Documentation intelligence | No | Checks submitted documents against requirements |
+| **Coverage Reasoning Agent** | Evidence assembly | No | Builds structured decision features and evaluation state |
+| **Companion Agent** | Explainability | Yes | Generates human-readable evidence-grounded explanations |
+| **Priority Agent** | Queue intelligence | No | Coordinates pending-case ranking using XGBoost |
+
+## Policy Evidence Agent
+
+The Policy Evidence Agent:
+
+1. Receives authorization context.
+2. Uses the RAG retrieval tool.
+3. Retrieves relevant policy evidence.
+4. Identifies the applicable policy.
+5. Extracts coverage information.
+6. Identifies named clinical criteria.
+7. Identifies required documentation.
+8. Returns structured policy evidence.
+
+## Clinical Evidence Agent
+
+The Clinical Evidence Agent:
+
+- Extracts diagnosis information.
+- Interprets clinical justification.
+- Evaluates diagnosis support.
+- Evaluates named policy criteria.
+- Produces structured PASS / FAIL / UNKNOWN results.
+- Calculates clinical evidence metrics.
+
+## Document Agent
+
+The Document Agent checks whether evidence required by the policy has been submitted.
+
+```text
+Policy requires:
+✓ Clinical Notes
+✓ Prescription
+✓ Laboratory Report
+
+Submitted:
+✓ Clinical Notes
+✓ Prescription
+✗ Laboratory Report
+```
+
+## Coverage Reasoning Agent
+
+The Coverage Reasoning Agent is the deterministic assembly layer.
+
+It receives policy, clinical, and documentation evidence and converts them into the structured representation required by the decision model.
+
+## Companion Agent
+
+The Companion Agent runs after decision intelligence has produced an outcome.
+
+It converts structured results into understandable language for users and does not override the underlying decision.
+
+---
+
+# Policy Retrieval — RAG
+
+## Vector Store
+
+The project uses:
+
+**PostgreSQL 17 + pgvector**
+
+The vector store is integrated into the primary PostgreSQL environment.
+
+## Embedding Pipeline
+
+```text
+Policy Document
+      ↓
+Text Extraction
+      ↓
+Chunking
+      ↓
+Sentence Transformer
+      ↓
+384-dimensional Embedding
+      ↓
+pgvector
+```
+
+Embedding model:
+
+```text
+sentence-transformers/all-MiniLM-L6-v2
+```
+
+## Retrieval Pipeline
+
+```text
+Authorization
+      ↓
+Payer / Coverage Context
+      ↓
+Vector Search
+      ↓
+Cosine Similarity
+      ↓
+Top Policy Chunks
+      ↓
+Policy Evidence Agent
+```
+
+The retrieved chunks provide evidence for policy interpretation rather than relying solely on the LLM's pretrained knowledge.
+
+---
+
+# ML Decision Intelligence
+
+The primary triage model is a:
+
+**Logistic Regression classifier**
+
+implemented using a scikit-learn pipeline with standardization.
+
+The model uses four structured features:
+
+| Feature | Description |
 |---|---|
-| **Doctor** | Submits new authorization requests, uploads supporting documents, tracks their own patients' request status and AI decisions |
-| **Nurse** | Reviews the AI-ranked queue of PEND cases, approves or requests more information (cannot deny) |
-| **Insurance Admin** | Full reviewer authority (approve/deny/request-info), analytics dashboard, audit trail, policy explorer |
-| **Patient** | Read-only view of their own requests, diagnosis, decision, and documents — no reviewer actions |
+| `policy_score` | How strongly the retrieved policy evidence applies to the request |
+| `documentation_score` | Proportion of required documents available |
+| `clinical_evidence_score` | Proportion of policy clinical criteria satisfied |
+| `diagnosis_supported` | Whether the diagnosis is supported by the policy |
 
-## Tech Stack
+```text
+Policy Agent
+     │
+     └── policy_score
+
+Document Agent
+     │
+     └── documentation_score
+
+Clinical Agent
+     │
+     ├── clinical_evidence_score
+     └── diagnosis_supported
+
+             ↓
+      Feature Vector
+             ↓
+     Logistic Regression
+             ↓
+       ML Confidence
+             ↓
+     APPROVE / PEND
+```
+
+The model is intentionally bounded to a small, auditable feature set.
+
+---
+
+# Priority Intelligence
+
+A separate ML system is used for pending-case prioritization.
+
+It does **not** make the original authorization decision.
+
+Its purpose is:
+
+> **Determine which pending authorization should be reviewed first.**
+
+## Priority Workflow
+
+```text
+PEND Authorization
+       ↓
+Priority Agent
+       ↓
+Validate Queue Case
+       ↓
+Calculate Queue Features
+       ↓
+XGBoost Ranker
+       ↓
+Safety-aware Priority
+       ↓
+Priority Tier + Reasons
+       ↓
+Nurse Dashboard
+```
+
+## Priority Agent
+
+The Priority Agent is implemented as a separate LangGraph workflow.
+
+It coordinates:
+
+1. Validation
+2. Feature preparation
+3. ML ranking
+4. Safety handling
+5. Priority tier generation
+6. Human-readable reason generation
+
+It does not make LLM calls.
+
+## XGBoost Priority Ranker
+
+The priority model is an:
+
+**XGBoost Ranker (`rank:ndcg`)**
+
+It ranks PEND cases relative to one another.
+
+### Nine features
+
+| Feature | Source |
+|---|---|
+| `policy_score` | Original triage evaluation |
+| `documentation_score` | Original triage evaluation |
+| `clinical_evidence_score` | Original triage evaluation |
+| `num_criteria_missing` | Original triage evaluation |
+| `hours_pending` | Calculated from submission time |
+| `sla_pressure` | Calculated from waiting time and SLA |
+| `urgency_weight` | Treatment urgency |
+| `care_setting_weight` | Place of service |
+| `clinical_risk_weight` | Derived clinical risk |
+
+Some queue values are recalculated because waiting time and SLA pressure change while a case remains pending.
+
+## Priority Safety Handling
+
+The XGBoost prediction is combined with deterministic safety handling:
+
+| Condition | Minimum Priority |
+|---|---:|
+| Emergency | 90 |
+| SLA breached | 88 |
+| SLA breach imminent | 80 |
+
+The final queue is automatically organized for nurses.
+
+---
+
+# Application Roles
+
+| Role | Responsibilities |
+|---|---|
+| **Doctor** | Submit authorization requests, upload evidence, track request status |
+| **Nurse** | Review prioritized PEND cases, inspect evidence, approve or request additional information |
+| **Insurance Admin** | Review authorizations, analytics, audit trail, policy intelligence |
+| **Patient** | View personal requests, status, decisions, and documents |
+
+---
+
+# Data Architecture
+
+```text
+                         PROAUTH AI
+                              │
+             ┌────────────────┴────────────────┐
+             │                                 │
+       PostgreSQL                         MongoDB Atlas
+             │                                 │
+     Application Data                 LangGraph State
+     Policy Corpus                    Checkpoints
+     pgvector                         Thread Context
+     Authorization Data               Resubmission State
+     Triage Evaluations
+```
+
+## PostgreSQL
+
+PostgreSQL is the primary application database.
+
+It stores:
+
+- Users
+- Patients
+- Providers
+- Insurance information
+- Authorization requests
+- Documents and metadata
+- Triage evaluations
+- Review information
+- Audit information
+- Policy information
+- Policy chunks
+- Vector embeddings
+- Other application entities
+
+The application uses:
+
+```text
+PostgreSQL 17
++
+Sequelize
++
+pgvector
+```
+
+## Vectorized Policy Data
+
+```text
+Policy
+│
+├── Policy Metadata
+├── Chunk 1 ──→ 384-d vector
+├── Chunk 2 ──→ 384-d vector
+├── Chunk 3 ──→ 384-d vector
+├── Chunk 4 ──→ 384-d vector
+└── ...
+```
+
+The vectors allow the RAG layer to find policy passages semantically related to an authorization request.
+
+## MongoDB Atlas
+
+MongoDB Atlas is used for LangGraph state and checkpointing.
+
+It supports:
+
+- LangGraph checkpoints
+- Agent state
+- Evidence trails
+- Request continuity
+- Resubmission handling
+- Context-aware processing
+
+Request-level identifiers such as:
+
+```text
+authorization_id
+thread_id
+```
+
+allow the system to maintain processing context.
+
+## Resubmission and Context-Aware Processing
+
+```text
+Initial Authorization
+        │
+        ├── authorization_id
+        └── thread_id
+              │
+              ▼
+        Agent Processing
+              │
+              ▼
+        Decision / PEND
+              │
+              ▼
+      Additional Evidence
+              │
+              ▼
+        Resubmission
+              │
+              ▼
+      Context-aware Processing
+```
+
+---
+
+# Data Security
+
+Clinical and decision information is encrypted at rest using:
+
+**AES-256-GCM**
+
+Sensitive fields include information such as:
+
+- Diagnosis
+- ICD-10 information
+- Clinical justification
+- Current medications
+- Clinical evidence
+- Clinical criteria evaluation
+- ML features
+- Decision explanation
+
+Additional security mechanisms include:
+
+- PostgreSQL/RDS storage encryption
+- TLS in transit
+- bcrypt password hashing
+- JWT authentication
+- Role-based application access
+
+Encryption at rest is one security layer and does not by itself constitute complete regulatory compliance.
+
+---
+
+# Technology Stack
 
 | Layer | Technology |
 |---|---|
-| Frontend | React, Vite, `react-three-fiber` (dashboard visualizations) |
-| Backend API | Node.js, Express, Sequelize |
-| Triage service | Python, FastAPI, LangGraph, scikit-learn |
-| Priority service | Python, FastAPI, LangGraph, XGBoost |
-| LLM | Groq (`openai/gpt-oss-120b`), real tool-calling |
-| Primary database | PostgreSQL 17 + `pgvector` |
-| Agent checkpoint store | MongoDB Atlas |
-| Auth | JWT, bcrypt |
-| Deployment | AWS ECS Fargate, RDS, S3, ALB — provisioned via AWS Copilot |
+| Frontend | React, Vite |
+| Visualization | react-three-fiber |
+| Backend | Node.js, Express |
+| ORM | Sequelize |
+| Triage API | Python, FastAPI |
+| Workflow Orchestration | LangGraph |
+| LLM | Groq |
+| LLM Model | `openai/gpt-oss-120b` |
+| Embeddings | `sentence-transformers/all-MiniLM-L6-v2` |
+| Vector Search | PostgreSQL + pgvector |
+| Primary Database | PostgreSQL 17 |
+| Agent State | MongoDB Atlas |
+| Decision ML | scikit-learn Logistic Regression |
+| Priority ML | XGBoost Ranker |
+| Authentication | JWT + bcrypt |
+| Cloud | AWS |
+| Containers | ECS Fargate |
+| Database Hosting | Amazon RDS |
+| Model Artifacts | Amazon S3 |
+| Load Balancing | Application Load Balancer |
+| Infrastructure | AWS Copilot |
 
-## Project Structure
+---
 
-```
+# Project Structure
+
+```text
 Practice_CTS/
-├── ProAuth_AI_FrontEnd/        React app — Doctor/Nurse/Insurance/Patient panels
-├── ProAuth_AI_BackEnd/         Node/Express API, PostgreSQL models, auth, review workflow
+│
+├── ProAuth_AI_FrontEnd/
+│   └── React/Vite applications
+│       ├── Doctor
+│       ├── Nurse
+│       ├── Insurance Admin
+│       └── Patient
+│
+├── ProAuth_AI_BackEnd/
+│   └── Node.js / Express API
+│       ├── Authentication
+│       ├── Authorizations
+│       ├── Documents
+│       ├── Reviews
+│       ├── Queue
+│       ├── Analytics
+│       └── Audit
+│
 ├── ProAuth_AI_ML/
-│   ├── policy-rag/             FastAPI triage service — RAG, agents, gates, decision model
-│   │   ├── agents/               Policy/Clinical/Document/Coverage-Reasoning/Companion agents
-│   │   ├── rag/                  pgvector retrieval
-│   │   ├── ml/                   Trained decision model
-│   │   └── triage_graph.py       LangGraph orchestration
-│   └── priority_intelligence/  FastAPI priority service — XGBoost ranker
-│       ├── agent/                Priority Agent (LangGraph)
-│       ├── ranker.py, safety.py, tiers.py
-├── copilot/                    AWS Copilot service manifests
-├── iam/                        Deployment IAM policy
-└── DEPLOYMENT.md                Full AWS deployment reference
+│   │
+│   ├── policy-rag/
+│   │   ├── agents/
+│   │   │   ├── Policy Agent
+│   │   │   ├── Clinical Agent
+│   │   │   ├── Document Agent
+│   │   │   ├── Coverage Reasoning
+│   │   │   └── Companion Agent
+│   │   ├── rag/
+│   │   │   └── pgvector retrieval
+│   │   ├── ml/
+│   │   │   └── Logistic Regression model
+│   │   └── triage_graph.py
+│   │
+│   └── priority_intelligence/
+│       ├── agent/
+│       │   └── Priority LangGraph
+│       ├── ranker.py
+│       ├── safety.py
+│       └── tiers.py
+│
+├── copilot/
+│   └── AWS service manifests
+│
+├── iam/
+│   └── IAM policies
+│
+└── DEPLOYMENT.md
 ```
 
-## Database
+---
 
-15 tables in PostgreSQL, the two most central being:
+# Deployment
 
-- **`authorizations`** — one row per submitted request; patient/provider/insurance/clinical detail,
-  mostly JSONB, encrypted where clinical.
-- **`triage_evaluations`** — one row per automated evaluation; the full agent evidence trail plus
-  the model's decision, encrypted where clinical/decision content.
+ProAuth AI is designed for AWS deployment using AWS Copilot.
 
-No formal migration framework exists yet (`sequelize.sync({ alter: true })` on boot); the encryption
-rollout was applied via a dedicated one-time migration script rather than relying on that mechanism.
+```text
+                         AWS
+                          │
+              ┌───────────▼───────────┐
+              │ Application Load       │
+              │ Balancer               │
+              └───────────┬───────────┘
+                          │
+        ┌─────────────────┼─────────────────┐
+        │                 │                 │
+        ▼                 ▼                 ▼
+   Frontend           Backend          ML Services
+   ECS Fargate        ECS Fargate      ECS Fargate
+        │                 │                 │
+        └─────────────────┼─────────────────┘
+                          │
+                 ┌────────▼────────┐
+                 │ Amazon RDS       │
+                 │ PostgreSQL       │
+                 └─────────────────┘
 
-## Running Locally
+                 Amazon S3
+                      │
+               Model Artifacts
 
-Requires Node.js, Python 3.11+, Docker (for PostgreSQL), and a Groq API key.
+              SSM Parameter Store
+                      │
+                   Secrets
+```
+
+Deployment components include:
+
+- AWS ECS Fargate
+- Amazon RDS PostgreSQL
+- Amazon S3
+- Application Load Balancer
+- AWS Copilot
+- SSM Parameter Store
+- IAM policies
+
+---
+
+# Local Development
+
+## Prerequisites
+
+- Node.js
+- Python 3.11+
+- Docker
+- PostgreSQL
+- MongoDB Atlas connection
+- Groq API key
+
+## 1. Start PostgreSQL
 
 ```bash
-# 1. Database
-cd ProAuth_AI_BackEnd && docker compose up -d
+cd ProAuth_AI_BackEnd
+docker compose up -d
+```
 
-# 2. Backend
-cd ProAuth_AI_BackEnd && npm install && cp .env.example .env   # fill in secrets
+## 2. Start Backend
+
+```bash
+cd ProAuth_AI_BackEnd
+
+npm install
+
+cp .env.example .env
+
 npm run dev
-
-# 3. Triage service
-cd ProAuth_AI_ML/policy-rag && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-cp ../.env.example ../.env   # fill in GROQ_AGENT_API_KEY, DATABASE_URL, MONGODB_URI
-.venv/bin/python3 -m uvicorn main:app --host 0.0.0.0 --port 8002
-
-# 4. Frontend
-cd ProAuth_AI_FrontEnd && npm install && npm run dev
 ```
 
-## Deployment (AWS)
-
-Provisioned via AWS Copilot CLI — ECS Fargate for all three services behind a shared ALB, RDS for
-PostgreSQL (storage-encrypted), S3 for the trained model artifact, secrets in SSM Parameter Store.
-Full architecture, IAM policy, and step-by-step commands are in `DEPLOYMENT.md`.
-
-## Testing
+## 3. Start Triage Service
 
 ```bash
-cd ProAuth_AI_ML/policy-rag && .venv/bin/python3 -m pytest tests/test_gates_unit.py -q
+cd ProAuth_AI_ML/policy-rag
+
+python3 -m venv .venv
+
+.venv/bin/pip install -r requirements.txt
+
+.venv/bin/python3 -m uvicorn main:app --host 0.0.0.0 --port 8002
 ```
 
-Unit tests cover all nine safety gates in isolation; integration scenarios in
-`tests/test_triage_integration.py` exercise real, previously live-verified request/outcome pairs
-against the actual pipeline.
+Configure:
 
+```text
+GROQ_AGENT_API_KEY
+DATABASE_URL
+MONGODB_URI
+```
+
+## 4. Start Frontend
+
+```bash
+cd ProAuth_AI_FrontEnd
+
+npm install
+
+npm run dev
+```
+
+---
+
+# Testing
+
+Run the triage tests:
+
+```bash
+cd ProAuth_AI_ML/policy-rag
+
+.venv/bin/python3 -m pytest tests/test_gates_unit.py -q
+```
+
+Integration scenarios are available in:
+
+```text
+tests/test_triage_integration.py
+```
+
+---
+
+# Complete Workflow
+
+```text
+                         DOCTOR
+                           │
+                           ▼
+                 AUTHORIZATION REQUEST
+                           │
+                           ▼
+                 POLICY IDENTIFICATION
+                           │
+                           ▼
+                    RAG RETRIEVAL
+                           │
+                           ▼
+                    POLICY EVIDENCE
+                           │
+             ┌─────────────┼─────────────┐
+             │             │             │
+             ▼             ▼             ▼
+        POLICY AGENT   CLINICAL AGENT  DOCUMENT AGENT
+             │             │             │
+             └─────────────┼─────────────┘
+                           │
+                           ▼
+                 COVERAGE REASONING
+                           │
+                           ▼
+                  FEATURE GENERATION
+                           │
+                           ▼
+                 LOGISTIC REGRESSION
+                           │
+                    ┌──────┴──────┐
+                    ▼             ▼
+                 APPROVE          PEND
+                    │             │
+                    │             ▼
+                    │       PRIORITY AGENT
+                    │             │
+                    │             ▼
+                    │       XGBOOST RANKER
+                    │             │
+                    │             ▼
+                    │      PRIORITIZED QUEUE
+                    │             │
+                    │             ▼
+                    │           NURSE
+                    │
+                    ▼
+              COMPANION AGENT
+                    │
+                    ▼
+          EXPLAINABLE AI OUTPUT
+```
+
+---
+
+# ProAuth AI Philosophy
+
+### 1. Ground decisions in policy evidence
+
+Retrieve relevant policy information before interpreting coverage.
+
+### 2. Separate evidence from decision intelligence
+
+Specialized agents gather and structure evidence, while trained ML models operate on bounded, structured inputs.
+
+### 3. Keep humans in the loop
+
+Cases requiring additional evidence, clinical judgment, or reviewer attention remain visible to human reviewers, while the priority-intelligence system helps determine **which pending case deserves attention first**.
+
+---
+
+## ProAuth AI
+
+**Evidence-grounded prior authorization intelligence for faster, more transparent healthcare authorization workflows.**
