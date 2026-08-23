@@ -1,11 +1,11 @@
-# ProAuth AI
+# ProAuth IQ
 
 > **AI-assisted prior authorization for healthcare — evidence-grounded, policy-aware, explainable, and human-reviewed.**
 
-ProAuth AI automates the evidence-gathering and risk-triage steps of medical prior authorization (PA) requests, while keeping every approval, denial, and edge case under deterministic safety rules and final human review. It combines retrieval-augmented policy lookup, a small team of specialized agents, a trained decision model, and a priority-ranking system — wired into a real multi-role web application backed by PostgreSQL, MongoDB, and AWS.
+ProAuth IQ automates the evidence-gathering and risk-triage steps of medical prior authorization (PA) requests, while keeping every approval, denial, and edge case under deterministic safety rules and final human review. It combines retrieval-augmented policy lookup, a small team of specialized agents, a trained decision model, and a priority-ranking system — wired into a real multi-role web application backed by PostgreSQL, MongoDB, and AWS.
 
 
-ProAuth AI is a full-stack healthcare prior-authorization platform that combines **RAG-based policy retrieval, specialized AI agents, machine-learning decision intelligence, pending-case prioritization, LangGraph orchestration, PostgreSQL/pgvector, MongoDB checkpointing, and a multi-role web application**.
+ProAuth IQ is a full-stack healthcare prior-authorization platform that combines **RAG-based policy retrieval, specialized AI agents, machine-learning decision intelligence, pending-case prioritization, LangGraph orchestration, PostgreSQL/pgvector, MongoDB checkpointing, and a multi-role web application**.
 
 ---
 
@@ -49,7 +49,7 @@ ProAuth AI addresses these challenges by bringing policy retrieval, evidence ext
 
 # Solution
 
-ProAuth AI provides an evidence-grounded prior-authorization pipeline.
+ProAuth IQ provides an evidence-grounded prior-authorization pipeline.
 
 A doctor submits an authorization request with clinical information and supporting documents. The system then:
 
@@ -89,7 +89,7 @@ The goal is not to replace clinical or insurance reviewers. The goal is to reduc
 
 ## Agents Gather Evidence. Models Provide Intelligence.
 
-ProAuth AI deliberately separates **evidence gathering**, **orchestration**, and **machine-learning decisions**.
+ProAuth IQ deliberately separates **evidence gathering**, **orchestration**, and **machine-learning decisions**.
 
 AI agents are responsible for tasks such as:
 
@@ -135,7 +135,7 @@ Nurse Review Queue
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         PROAUTH AI PLATFORM                                 │
+│                         PROAUTH IQ PLATFORM                                 │
 └─────────────────────────────────────────────────────────────────────────────┘
 
                          USER APPLICATIONS
@@ -575,7 +575,7 @@ The final queue is automatically organized for nurses.
 # Data Architecture
 
 ```text
-                         PROAUTH AI
+                         PROAUTH IQ
                               │
              ┌────────────────┴────────────────┐
              │                                 │
@@ -795,7 +795,7 @@ Practice_CTS/
 
 # Deployment
 
-ProAuth AI is designed for AWS deployment using AWS Copilot.
+ProAuth IQ is designed for AWS deployment using AWS Copilot.
 
 ```text
                          AWS
@@ -977,7 +977,7 @@ tests/test_triage_integration.py
 
 ---
 
-# ProAuth AI Philosophy
+# ProAuth IQ Philosophy
 
 ### 1. Ground decisions in policy evidence
 
@@ -993,6 +993,6 @@ Cases requiring additional evidence, clinical judgment, or reviewer attention re
 
 ---
 
-## ProAuth AI
+## ProAuth IQ
 
 **Evidence-grounded prior authorization intelligence for faster, more transparent healthcare authorization workflows.**

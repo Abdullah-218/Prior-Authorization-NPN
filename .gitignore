@@ -1,0 +1,9 @@
+.vscode/
+.claude/
+iam/
+DEPLOYMENT.md
+DEPLOYED_SERVICES.txt
+copilot/
+docker-compose.yml
+docs
+.env.example
