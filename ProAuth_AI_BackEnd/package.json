@@ -1,0 +1,36 @@
+{
+  "name": "proauth-ai-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "test": "node --test tests/**/*.test.js",
+    "test:integration": "RUN_INTEGRATION_TESTS=true node --test tests/**/*.test.js",
+    "import-drugs": "node src/scripts/importDrugLabels.js",
+    "import-drugs-by-name": "node src/scripts/importDrugLabelsByName.js",
+    "seed-clinical-data": "node src/scripts/seedClinicalData.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.6",
+    "dotenv": "^16.4.0",
+    "express": "^4.21.2",
+    "groq-sdk": "^0.9.1",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.10.0",
+    "multer": "^2.2.0",
+    "pg": "^8.23.0",
+    "pgvector": "^0.2.1",
+    "sequelize": "^6.37.8",
+    "sqlite3": "^5.1.0",
+    "swagger-jsdoc": "^6.3.0",
+    "swagger-ui-express": "^5.0.1",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "supertest": "^7.0.0"
+  }
+}

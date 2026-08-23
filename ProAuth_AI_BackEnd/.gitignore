@@ -1,0 +1,7 @@
+node_modules/
+data/
+drug-label-0001-of-0014.json
+.env
+Dockerfile
+.dockerignore
+uploads
