@@ -1,0 +1,70 @@
+.login-page{min-height:100vh;position:relative;overflow:hidden;background:#dfece8;padding:28px 6vw;color:var(--navy)}
+.login-frame{position:relative;z-index:1;max-width:1180px;margin:auto}
+.login-header{display:flex;align-items:center;justify-content:space-between}
+
+/* Decorative only — inert 3D ring motif sitting strictly behind
+   .login-frame (z-index:0 vs. the frame's z-index:1), never intercepting
+   clicks (pointer-events:none) or affecting layout (absolute, out of
+   flow). Same lightweight "plain CSS circles" approach already used for
+   Landing.jsx's .landing-orbit / the dashboard hero's .orb — no 3D
+   library, just perspective + rotateX to tilt flat circles into an
+   ellipse and a slow per-ring rotation for the "orbiting" motion. */
+.login-rings{position:absolute;inset:0;z-index:0;pointer-events:none;display:flex;align-items:center;justify-content:center;perspective:1800px}
+.login-rings-stage{position:relative;width:min(1700px,150vw);height:min(1700px,150vw);transform-style:preserve-3d;transform:rotateX(60deg) rotateZ(-8deg)}
+.login-ring{position:absolute;inset:0;margin:auto;border-radius:50%;border:1px solid rgba(38,140,130,.19)}
+.login-ring.r1{width:100%;height:100%;animation:loginRingSpin 70s linear infinite}
+.login-ring.r2{width:78%;height:78%;border-color:rgba(38,140,130,.16);animation:loginRingSpinReverse 54s linear infinite}
+.login-ring.r3{width:56%;height:56%;border-color:rgba(38,140,130,.24);animation:loginRingSpin 40s linear infinite}
+.login-ring.r4{width:34%;height:34%;border:1px dashed rgba(38,140,130,.3);animation:loginRingSpinReverse 28s linear infinite}
+.login-ring-dot{position:absolute;top:-4px;left:50%;transform:translateX(-50%);width:9px;height:9px;border-radius:50%;background:#2a8a83;box-shadow:0 0 14px 3px rgba(42,138,131,.5)}
+@keyframes loginRingSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes loginRingSpinReverse{from{transform:rotate(360deg)}to{transform:rotate(0deg)}}
+@media(max-width:1000px){.login-rings{display:none}}
+.login-brand{display:flex;align-items:center;gap:10px;font-family:Manrope;font-weight:800;letter-spacing:.4px;font-size:17px}
+.login-brand b{color:#3f9d95}
+.login-content{width:100%;display:grid;grid-template-columns:minmax(320px,1fr) minmax(440px,500px);gap:clamp(48px,8vw,120px);align-items:center;margin:7vh auto 0}
+
+.login-copy{position:relative;max-width:480px;padding-top:4px}
+.login-tag{position:relative;z-index:1;display:inline-flex;align-items:center;gap:7px;font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#247f75;background:#dbf3ec;border:1px solid #c7e9e1;padding:6px 12px 6px 10px;border-radius:20px}
+.login-tag i{width:6px;height:6px;border-radius:50%;background:#2a8a83;display:inline-block;font-style:normal}
+.login-accent{position:relative;z-index:1;display:block;width:38px;height:3px;border-radius:3px;background:#2a8a83;margin:18px 0 16px}
+.login-copy h1{position:relative;z-index:1;font:800 clamp(40px,4.6vw,60px)/1.02 Manrope;letter-spacing:-1.8px;margin:0 0 18px}
+.login-copy h1 em{font-style:normal;color:#2a8a83}
+.login-copy>p{position:relative;z-index:1;font-size:15.5px;line-height:1.65;color:#617783;max-width:400px;margin:0}
+.login-proof{position:relative;z-index:1;display:flex;gap:26px;margin-top:32px;flex-wrap:wrap}
+.login-proof-item{display:flex;gap:10px;align-items:center}
+.login-proof-item>span{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#d9eee9;color:#247f75;flex:none}
+.login-proof-item div{display:flex;flex-direction:column;gap:2px}
+.login-proof-item strong{font-size:12px}
+.login-proof-item small{font-size:10.5px;color:#5d6e78}
+
+.login-panel{background:#fff;border:1px solid #dbe6e5;border-radius:20px;padding:30px 32px 32px;box-shadow:0 24px 60px rgba(18,53,82,.09)}
+.login-panel-top{display:flex;align-items:center;gap:13px;margin-bottom:24px}
+.login-panel-mark{width:42px;height:42px;display:grid;place-items:center;background:#d4f1ee;color:#217a75;border-radius:11px;flex:none}
+.login-panel-top .eyebrow{margin:0 0 3px}
+.login-panel h2{font:800 26px/1.1 Manrope;margin:0}
+.role-picker{border:0;padding:0;margin:0 0 20px}
+.role-grid{display:grid;gap:7px}
+.role-option{width:100%;display:flex;align-items:center;gap:11px;text-align:left;padding:11px 12px;border:1px solid #dce7e8;border-radius:10px;background:#fbfdfd;transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease,background .16s ease}
+.role-option:hover{border-color:#8dc5bd;background:#f5fbf9;transform:translateY(-1px)}
+.role-option.selected{border-color:#53a79d;background:#dbf3ec;box-shadow:0 8px 18px rgba(38,140,130,.16);transform:translateY(-1px)}
+.role-option-icon{display:grid;place-items:center;width:33px;height:33px;border-radius:9px;background:#e8f1f3;color:#42758a;flex:none}
+.role-option.selected .role-option-icon{background:#d5eee8;color:#237d73}
+.role-option>span:nth-child(2){display:flex;flex-direction:column;gap:3px;flex:1}
+.role-option strong{font-size:12px}
+.role-option small{font-size:10px;color:#5c6e78}
+.role-option>i{display:grid;place-items:center;width:18px;height:18px;border:1px solid #c6d5d7;border-radius:50%;color:#fff;font-style:normal;flex:none}
+.role-option.selected>i{border-color:#268c82;background:#268c82}
+.login-inputs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px}
+.login-field{display:flex;flex-direction:column;gap:7px;font-size:11px;font-weight:700}
+.login-field input{width:100%;border:1px solid #d5e1e3;border-radius:9px;background:#fbfdfd;padding:11px 12px;color:var(--navy);outline:0;transition:border-color .16s ease,box-shadow .16s ease,background .16s ease}
+.login-field input:focus{border-color:#4fa69c;background:#fff;box-shadow:0 0 0 3px #e1f3ef}
+.login-submit{margin-top:20px;width:100%;border:0;border-radius:9px;background:#123b52;color:#fff;display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;font-weight:700;transition:background .16s ease,transform .16s ease,box-shadow .16s ease}
+.login-submit:hover{background:#176976;transform:translateY(-1px);box-shadow:0 8px 18px rgba(18,53,82,.22)}
+.login-error{margin:12px 0 0;color:#b34e4e;background:#fff0ef;border:1px solid #f0c9c5;padding:9px;border-radius:8px;font-size:11px}
+.login-notice{display:flex;align-items:flex-start;gap:7px;color:#5d6e75;font-size:10px;line-height:1.45;margin:16px 0 0}
+.login-notice svg{flex:none}
+
+@media(max-width:1200px){.login-content{gap:clamp(36px,6vw,70px)}}
+@media(max-width:850px){.login-page{padding:22px 17px}.login-content{grid-template-columns:1fr;gap:30px;margin-top:6vh;max-width:540px}.login-copy{max-width:100%}.login-copy h1{font-size:43px}.login-proof{display:none}}
+@media(max-width:520px){.login-panel{padding:24px 19px}.login-inputs{grid-template-columns:1fr}.login-copy h1{font-size:38px}.login-tag{font-size:9.5px}}

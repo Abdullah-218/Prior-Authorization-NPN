@@ -1,0 +1,26 @@
+.clinical-review-table .thead,
+.clinical-review-table .trow {
+  grid-template-columns: 95px 110px minmax(145px, 1.15fr) minmax(155px, 1.25fr) minmax(155px, 1.25fr) minmax(105px, .9fr) minmax(115px, .95fr) 85px minmax(115px, .95fr) 125px;
+  min-width: 1245px;
+}
+
+.clinical-review-table .priority-column {
+  align-items: center;
+}
+
+.clinical-review-table .trow > span {
+  min-width: 0;
+}
+
+.clinical-review-table .truncate-cell {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clinical-review-table .confidence-column {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}

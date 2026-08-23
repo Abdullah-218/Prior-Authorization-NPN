@@ -1,0 +1,335 @@
+/* Shared alignment and spacing rules using the existing app scale. */
+.card:not(.stat) {
+  padding: 21px;
+}
+
+/* Rows rendered as <button> (for keyboard/click semantics) must not show the
+   browser's default button chrome — Safari in particular fills unstyled
+   buttons with a visible grey background, making every row look "selected". */
+button.trow,
+button.attention-row {
+  background: transparent;
+  border: 0;
+  font: inherit;
+  text-align: left;
+}
+
+button.trow {
+  border-top: 1px solid #edf1f2;
+}
+
+.page > .card + .card,
+.page > .simple + .card {
+  margin-top: 15px;
+}
+
+.patient-section-label {
+  margin-top: 15px;
+  margin-bottom: 16px;
+}
+
+.auth-history-card {
+  margin-top: 15px;
+}
+
+.card > .section-title {
+  gap: 11px;
+  margin-bottom: 16px;
+}
+
+.policy-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  padding: 15px 0;
+}
+
+.policy-meta span {
+  min-width: 0;
+  gap: 5px;
+}
+
+.policy-meta b {
+  line-height: 1.2;
+}
+
+.fields {
+  align-items: start;
+}
+
+.field {
+  min-width: 0;
+  gap: 6px;
+}
+
+.criteria {
+  display: grid;
+  grid-template-columns: 7px minmax(0, 1fr);
+  align-items: start;
+  column-gap: 8px;
+  row-gap: 5px;
+}
+
+.criteria > small,
+.criteria > .badge {
+  grid-column: 2;
+  margin-left: 0;
+}
+
+.form-title {
+  align-items: start;
+  gap: 16px;
+}
+
+.request-table {
+  min-width: 0;
+}
+
+.request-table .thead,
+.request-table .trow {
+  column-gap: 11px;
+}
+
+.request-table .thead > span,
+.request-table .trow > strong,
+.request-table .trow > span,
+.request-table .trow > small {
+  min-width: 0;
+  align-self: center;
+}
+
+.request-table .trow > .badge {
+  justify-self: start;
+}
+
+.request-table .trow > span,
+.request-table .trow > small,
+.request-table .trow > strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.request-table .trow > span {
+  white-space: nowrap;
+}
+
+.clinical-review-table .trow > span {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.section-title h3 {
+  line-height: 1.25;
+}
+
+.nav-item {
+  align-items: center;
+}
+
+.login-panel-top > div:last-child {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.login-panel-top .eyebrow {
+  margin-bottom: 0;
+}
+
+.login-panel-top h2 {
+  margin-top: 0;
+}
+
+.page-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.page-heading > div,
+.stat,
+.stat > div {
+  min-width: 0;
+}
+
+.attention-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 11px;
+  align-items: center;
+}
+
+.attention-row > div:first-child {
+  min-width: 0;
+}
+
+.attention-row .badge {
+  margin-left: 0;
+}
+
+.reviewer-activity-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(100%, 560px);
+  margin-inline: auto;
+}
+
+.reviewer-activity-list .attention-row {
+  width: 100%;
+}
+
+.nurse-stat-grid .stat {
+  flex: 0 1 calc((100% - 45px) / 4);
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.nurse-stat-grid .stat > div {
+  text-align: center;
+}
+
+.nurse-stat-grid {
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  gap: 15px;
+}
+
+@media (max-width: 1050px) {
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .nurse-stat-grid .stat {
+    flex-basis: calc((100% - 15px) / 2);
+  }
+}
+
+@media (max-width: 720px) {
+  .page-heading {
+    flex-direction: column;
+  }
+
+  .stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .nurse-stat-grid {
+    flex-direction: column;
+  }
+
+  .nurse-stat-grid .stat {
+    flex-basis: auto;
+  }
+}
+
+.role-hero-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 16px;
+  align-items: center;
+  background: linear-gradient(135deg, #eef8f7 0%, #f4fbfa 55%, #ffffff 100%);
+  border: 1px solid #dcefec;
+  border-radius: 16px;
+  padding: 30px 34px;
+  box-shadow: 0 10px 26px rgba(23, 109, 114, .09);
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.role-hero-eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  color: #3f9d95;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+}
+
+.role-hero-sub {
+  color: #5c7079;
+  font-size: 13px;
+  line-height: 1.55;
+  max-width: 460px;
+  margin: 0 0 20px;
+}
+
+.role-hero-heading .hero-model {
+  height: 120px;
+  min-width: 0;
+}
+
+.role-hero-heading > div:first-child {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.role-hero-heading > div:first-child h1 {
+  margin-bottom: 4px;
+}
+
+.hero-cta {
+  padding: 13px 22px;
+  font-size: 13px;
+  min-height: 44px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #1c7d82 0%, #124e52 100%);
+  border-color: transparent;
+  box-shadow: 0 6px 16px rgba(20, 78, 82, .3);
+  letter-spacing: .2px;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+
+.hero-cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 9px 20px rgba(20, 78, 82, .36);
+}
+
+.hero-cta:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 10px rgba(20, 78, 82, .3);
+}
+
+@media (max-width: 720px) {
+  .role-hero-heading {
+    grid-template-columns: 1fr;
+    padding: 24px 22px;
+  }
+
+  .role-hero-heading .hero-model {
+    height: 130px;
+    max-width: 190px;
+    justify-self: end;
+  }
+}
+
+/* Topbar identity (name + role) was visually backwards — the person's own
+   name rendered smaller/lighter than the role caption below it. Name is
+   now the prominent element, role is the small caption underneath, same
+   hierarchy as a standard account menu. */
+.active-role {
+  gap: 2px;
+}
+
+.active-role small {
+  font-size: 12px;
+  letter-spacing: 0;
+  color: #1c3a52;
+  font-weight: 700;
+}
+
+.active-role strong {
+  font-size: 10px;
+  color: #5d7186;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}

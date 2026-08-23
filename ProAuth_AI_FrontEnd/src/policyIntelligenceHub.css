@@ -1,0 +1,206 @@
+/* Policy Intelligence Hub — static, explanatory 2.5D system diagram.
+   Reuses the app's existing tokens (--navy/--teal/--blue/--green/--amber/
+   --line, all defined in styles.css's :root) rather than inventing a new
+   palette. Pure CSS + inline SVG, same lightweight "decorative graphics,
+   no 3D library" convention already established for .landing-orbit and
+   .login-rings this session — see PolicyIntelligenceHub.jsx's trailing
+   comment for the full reasoning.
+
+   Sizing deliberately compact throughout (2026-08-21, feedback: "too
+   large and complicated") — every dimension below was scaled down from
+   an earlier, taller/wider first pass, and the diagram itself was
+   shortened from 8 elements to 6 (Reasoning Engine / Companion Agent
+   removed as separate cards — see PolicyIntelligenceHub.jsx). */
+
+.pih-heading-sub{margin:4px 0 0;font-size:11.5px;color:#6a7f90;font-weight:400}
+
+/* Side-by-side on desktop (2026-08-21, feedback: the stacked layout left
+   a large empty column to the right of the narrow vertical chain) —
+   diagram on the left, explainer filling the remaining width on the
+   right. Falls back to stacked below 900px, see media query at bottom. */
+.pih{display:flex;flex-direction:row;align-items:center;gap:56px;padding-top:4px}
+
+/* ---------- Graph shell ---------- */
+.pih-graph{
+  position:relative;
+  flex:none;max-width:460px;width:100%;
+  margin-left:clamp(0px,4vw,64px);
+  display:grid;
+  grid-template-columns:1fr 1.7fr 1fr;
+  grid-template-areas:
+    ".    rag      ."
+    ".    connA    ."
+    "triad triad triad"
+    ".    connB    ."
+    ".    pa       ."
+    ".    connC    ."
+    ".    triage   ."
+  ;
+  row-gap:2px;
+}
+.pih-slot--rag{grid-area:rag;justify-self:center}
+.pih-slot--connA{grid-area:connA}
+.pih-slot--triad{grid-area:triad}
+.pih-slot--connB{grid-area:connB}
+.pih-slot--pa{grid-area:pa;justify-self:center}
+.pih-slot--connC{grid-area:connC}
+.pih-slot--triage{grid-area:triage;justify-self:center;display:flex;flex-direction:column;align-items:center;gap:8px}
+
+/* ---------- Connectors (RAG->Policy, Policy->PA, PA->ML Triage) ---------- */
+.pih-connector{width:2px;height:22px;margin:0 auto;position:relative}
+.pih-connector svg{width:26px;height:100%;position:absolute;left:50%;top:0;transform:translateX(-50%);overflow:visible}
+.pih-connector-path{fill:none;stroke:rgba(38,140,130,.28);stroke-width:1.5;stroke-linecap:round;transition:stroke .25s ease,stroke-width .25s ease}
+.pih-particle{fill:#2f9a90}
+
+/* ---------- Triad row (Clinical <- Policy -> Document) ---------- */
+.pih-slot--triad{position:relative;display:grid;grid-template-columns:1fr 1.3fr 1fr;align-items:center;gap:4px;padding:4px 0}
+.pih-triad-svg{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.pih-curve{fill:none;stroke:rgba(38,140,130,.24);stroke-width:1.5;stroke-linecap:round;transition:stroke .25s ease,stroke-width .25s ease}
+.pih-slot--triad .pih-node{justify-self:center;z-index:1}
+.pih-core-wrap{position:relative;z-index:1;justify-self:center}
+
+/* Hover a node -> brighten its own incident connector(s). :has() keeps
+   this purely CSS, no JS state needed for a decorative highlight. */
+.pih-graph:has(.pih-node--rag:hover) #pih-path-rag-policy,
+.pih-graph:has(.pih-node--rag:focus-visible) #pih-path-rag-policy,
+.pih-graph:has(.pih-core:hover) #pih-path-rag-policy,
+.pih-graph:has(.pih-core:hover) #pih-path-policy-pa,
+.pih-graph:has(.pih-node--policyAgent:hover) #pih-path-policy-pa,
+.pih-graph:has(.pih-node--policyAgent:focus-visible) #pih-path-policy-pa,
+.pih-graph:has(.pih-node--policyAgent:hover) #pih-path-pa-triage,
+.pih-graph:has(.pih-node--triage:hover) #pih-path-pa-triage,
+.pih-graph:has(.pih-node--triage:focus-visible) #pih-path-pa-triage
+{stroke:#2f9a90;stroke-width:2.1}
+.pih-slot--triad:has(.pih-node--clinical:hover) .pih-curve--clinical,
+.pih-slot--triad:has(.pih-node--clinical:focus-visible) .pih-curve--clinical,
+.pih-slot--triad:has(.pih-core:hover) .pih-curve--clinical,
+.pih-slot--triad:has(.pih-node--document:hover) .pih-curve--document,
+.pih-slot--triad:has(.pih-node--document:focus-visible) .pih-curve--document,
+.pih-slot--triad:has(.pih-core:hover) .pih-curve--document
+{stroke:#2f9a90;stroke-width:2.1}
+
+/* ---------- Node cards ---------- */
+.pih-node{
+  position:relative;display:flex;align-items:center;gap:7px;
+  background:#fff;border:1px solid var(--line);border-radius:10px;
+  padding:7px 10px;width:128px;
+  box-shadow:0 2px 5px rgba(23,53,82,.05);
+  cursor:default;outline:none;
+  transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease;
+}
+.pih-node:hover,.pih-node:focus-visible{
+  transform:translateY(-2px);
+  border-color:#9bcfc7;
+  box-shadow:0 10px 20px rgba(38,140,130,.15);
+  z-index:5;
+}
+.pih-node-icon{width:24px;height:24px;flex:none;border-radius:7px;display:grid;place-items:center;background:#e6f6f4;color:#1f8078}
+.pih-node-text{display:flex;flex-direction:column;gap:0;min-width:0}
+.pih-node-text strong{font-size:10.5px;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pih-node-text small{font-size:8.5px;color:#5d6e78;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pih-node--big{width:160px;padding:10px 13px}
+.pih-node--big .pih-node-icon{width:28px;height:28px}
+.pih-node--big .pih-node-text strong{font-size:11.5px}
+.pih-node-state{position:absolute;top:-8px;right:8px;display:flex;align-items:center;gap:3px;background:#e6f6f4;color:#1f8078;border:1px solid #cdeae4;border-radius:20px;padding:1px 6px 1px 5px;font-size:7.5px;font-weight:700}
+
+/* Distinguish the branch-agent icons slightly so the triad reads as two
+   peers flanking the core, not three identical boxes. */
+.pih-node--clinical .pih-node-icon{background:#eaf3fb;color:#2e70ad}
+.pih-node--document{width:138px}
+.pih-node--document .pih-node-icon{background:#eaf3fb;color:#2e70ad}
+.pih-node--triage .pih-node-icon{background:#fff2d8;color:#a87829}
+
+/* ---------- Tooltip ---------- */
+.pih-tooltip{
+  position:absolute;left:50%;bottom:calc(100% + 8px);transform:translate(-50%,4px);
+  width:180px;background:#123552;color:#eaf3f4;font-size:10px;line-height:1.45;
+  padding:8px 10px;border-radius:7px;box-shadow:0 12px 24px rgba(18,53,82,.28);
+  opacity:0;visibility:hidden;pointer-events:none;
+  transition:opacity .16s ease,transform .16s ease;
+  z-index:20;
+}
+.pih-tooltip::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:#123552}
+.pih-node:hover .pih-tooltip,.pih-node:focus-visible .pih-tooltip{opacity:1;visibility:visible;transform:translate(-50%,0)}
+.pih-tooltip--core{width:210px;bottom:auto;top:calc(100% + 10px)}
+.pih-tooltip--core::after{top:auto;bottom:100%;border-top-color:transparent;border-bottom-color:#123552}
+.pih-core:hover .pih-tooltip--core,.pih-core:focus-visible .pih-tooltip--core{opacity:1;visibility:visible;transform:translate(-50%,0)}
+
+/* ---------- Policy core (kept compact — see PolicyIntelligenceHub.jsx's
+   PolicyCore comment) ---------- */
+.pih-core{position:relative;width:150px;padding:3px;cursor:default;outline:none}
+.pih-core-glow{position:absolute;inset:-18px;border-radius:50%;background:radial-gradient(circle,rgba(71,158,154,.22),transparent 70%);filter:blur(2px);z-index:0}
+.pih-core-layer{position:absolute;inset:4px 3px;border-radius:13px;background:#eef6f5;border:1px solid #dcebe8;z-index:1}
+.pih-core-layer--2{transform:translate(6px,7px) rotate(3deg);opacity:.4}
+.pih-core-layer--1{transform:translate(3px,4px) rotate(1.4deg);opacity:.65}
+.pih-core-face{
+  position:relative;z-index:2;
+  background:linear-gradient(160deg,rgba(255,255,255,.95),rgba(238,249,247,.88));
+  backdrop-filter:blur(6px);
+  border:1px solid rgba(38,140,130,.26);
+  border-radius:13px;padding:11px 12px 10px;
+  box-shadow:0 14px 26px rgba(23,53,82,.13),inset 0 1px 0 rgba(255,255,255,.7);
+  transform:perspective(700px) rotateX(4deg) rotateY(-6deg);
+  transition:transform .25s ease,box-shadow .25s ease;
+  display:flex;flex-direction:column;align-items:flex-start;gap:2px;
+}
+.pih-core:hover .pih-core-face,.pih-core:focus-visible .pih-core-face{
+  transform:perspective(700px) rotateX(0deg) rotateY(0deg) translateY(-2px);
+  box-shadow:0 18px 32px rgba(23,53,82,.17),inset 0 1px 0 rgba(255,255,255,.8);
+}
+.pih-core-badge{display:inline-flex;align-items:center;gap:4px;font-size:7px;font-weight:700;letter-spacing:.4px;color:#1f8078;background:#e6f6f4;border:1px solid #cdeae4;border-radius:20px;padding:2px 6px;margin-bottom:3px}
+.pih-core-title{font-family:Manrope;font-weight:800;font-size:15px;letter-spacing:-.3px;color:var(--navy)}
+.pih-core-sub{font-size:9px;color:#5c7284}
+.pih-core-truth{margin-top:3px;font-size:7px;font-weight:700;letter-spacing:.8px;color:#5b6e7e}
+
+/* ---------- ML Triage outcome chips ---------- */
+.pih-outcomes{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-width:180px}
+.pih-outcome{font-size:8px;font-weight:700;letter-spacing:.25px;padding:3px 7px;border-radius:20px;border:1px solid transparent}
+.pih-outcome--approve{background:var(--green-bg);color:var(--green);border-color:#cdeade}
+.pih-outcome--pend{background:var(--blue-bg);color:var(--blue);border-color:#cfe3f4}
+.pih-outcome--info{background:var(--amber-bg);color:var(--amber);border-color:#f0dfb3}
+
+/* ---------- Explainer panel ---------- */
+.pih-explainer{flex:1;min-width:0;border-left:2px solid var(--line);padding:4px 0 4px 32px;text-align:left}
+.pih-explainer-eyebrow{font-size:10px;font-weight:700;letter-spacing:1.2px;color:#4d7080;margin:0 0 8px}
+.pih-explainer-copy{font-size:13px;line-height:1.75;color:#5c7284;margin:0 0 12px;max-width:440px}
+.pih-explainer-copy:last-of-type{margin-bottom:14px}
+.pih-explainer-points{list-style:none;margin:0;padding:14px 0 0;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:9px;max-width:440px}
+.pih-explainer-points li{display:flex;align-items:flex-start;gap:8px;font-size:12px;line-height:1.5;color:#42586a}
+.pih-explainer-points svg{flex:none;margin-top:2px;color:#2f9a90;background:#e6f6f4;border-radius:50%;padding:2px;width:16px;height:16px;box-sizing:border-box}
+
+/* ---------- Tablet: reduce spacing, drop back to stacked ---------- */
+@media(max-width:1050px){
+  .pih-node{width:112px;padding:6px 9px;gap:6px}
+  .pih-node--big{width:140px}
+  .pih-node--document{width:122px}
+  .pih-core{width:132px}
+  .pih-core-title{font-size:13px}
+  .pih-graph{grid-template-columns:1fr 1.5fr 1fr;max-width:600px;margin:0 auto;flex:none}
+  /* Side-by-side needs real width — narrower than this, stack instead
+     (graph on top, explainer below) rather than squeezing both columns. */
+  .pih{flex-direction:column;gap:16px}
+  .pih-explainer{border-left:none;border-top:1px solid var(--line);padding:10px 0 0;text-align:center}
+  .pih-explainer-copy{margin:0 auto 12px;max-width:520px}
+  .pih-explainer-points{margin:0 auto;max-width:440px;border-top:1px solid var(--line)}
+}
+
+/* ---------- Mobile: clean vertical sequence, Policy first ---------- */
+@media(max-width:720px){
+  .pih-graph{
+    grid-template-columns:1fr;
+    grid-template-areas:
+      "triad"
+      "rag"
+      "pa"
+      "triage"
+    ;
+    row-gap:12px;max-width:240px;
+  }
+  .pih-connector,.pih-triad-svg{display:none}
+  .pih-slot--triad{display:flex;flex-direction:column;align-items:center;gap:10px;padding:0}
+  .pih-slot--triad .pih-node{order:2}
+  .pih-core-wrap{order:1}
+  .pih-slot--rag,.pih-slot--pa,.pih-slot--triage{justify-self:center}
+  .pih-node,.pih-node--big{width:100%;max-width:220px}
+  .pih-tooltip{display:none}
+}
