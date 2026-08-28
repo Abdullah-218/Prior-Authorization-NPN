@@ -5,4 +5,5 @@ DEPLOYED_SERVICES.txt
 copilot/
 docker-compose.yml
 docs
-.env.exampledocumentation/ProAuthIQ-Demo.mp4
+.env.example
+documentation/ProAuthIQ-Demo.mp4
