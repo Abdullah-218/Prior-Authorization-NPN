@@ -38,111 +38,20 @@ from sentence_transformers import SentenceTransformer
 load_dotenv()
 
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
-
-# A patient's PRIVATE-tier plan (Silver/Gold/Premium — see insurance_plans'
-# "tier" column) is deliberately NOT tied to one specific real payer brand.
-# Per explicit decision (2026-08-19): treat "Private" as one consolidated
-# policy type whose retrieval scope is the UNION of every real private
-# payer we've ingested, rather than scoping to a single payer and risking
-# an honest "no evidence found" purely because THAT ONE payer happens to
-# have no public bulletin for the requested category (a real, observed gap
-# — e.g. UnitedHealthcare defers ~5 categories entirely to a licensed
-# InterQual guideline with no public criteria text). Widening the scope to
-# "any of our real private payers" still only ever surfaces genuine,
-# grounded policy text — never Medicare, never a fabricated "combined"
-# document — it just stops one payer's documentation gap from masking
-# another payer's real, applicable coverage answer.
 PRIVATE_PAYER_GROUP = ["Aetna", "Cigna", "UnitedHealthcare"]
 
 HIGH_CONFIDENCE_MAX_DISTANCE = 0.35
 MEDIUM_CONFIDENCE_MAX_DISTANCE = 0.50
 
-# Caps how many candidates a single policy SECTION can supply within
-# stage 2's per-policy pull (see below). Without this, a section that
-# happens to be chunked more finely than its siblings within the SAME
-# policy would systematically win every nearest-neighbor slot on any
-# query that's merely topically adjacent — not because it's actually the
-# better match, but because it has more, sharper candidates in the race.
-# Mostly a defensive backstop now that items #40-42 (2026-08-20) fixed
-# every policy's own sections down to ~1 chunk each in the normal case —
-# kept for any future policy that isn't yet as well-structured.
 MAX_PER_SECTION = 3
 
-# Two-stage retrieval (2026-08-20+ — see docs/PROGRESS_TRACKER.md §9.8): a
-# NEW bottleneck surfaced immediately after items #40-42 fixed
-# MAX_PER_SECTION's starvation bug — every policy is now finely chunked
-# (up to 46 real, independent chunks for one policy, e.g. Aetna knee
-# arthroplasty), but the old single-stage query's flat `top_k` cap on the
-# ENTIRE payer-group union meant one large, genuinely-relevant policy
-# could crowd out most of its OWN branches just to stay under that shared
-# ceiling — live-verified: a "total knee arthroplasty" query filled 11 of
-# 16 slots from Aetna's 46-chunk policy alone, leaving ~35 of its own real
-# criteria unreachable, not because they're irrelevant but because top_k
-# ran out of room. Raising top_k globally would fix this but pays a token
-# cost on EVERY query, including the common single-small-policy case that
-# was never broken. Two-stage retrieval instead scales cost with how much
-# a SPECIFIC query actually needs:
-#   Stage 1 — identify WHICH policy/policies are actually relevant (cheap:
-#   one GROUP BY query, ranks policies by their own best-matching chunk).
-#   Stage 2 — pull DEEPLY from just those few policies (up to
-#   STAGE2_MAX_CHUNKS_PER_POLICY each), not a flat cap shared by every
-#   irrelevant policy in the corpus too.
-# Confidence gating is UNCHANGED — still computed from the single best
-# chunk distance found, exactly as before; only how many chunks get
-# assembled around that best match changes.
 STAGE1_MAX_CANDIDATE_POLICIES = 3  # covers the observed 2-relevant-policy case (Aetna knee + Cigna TKA) with headroom for a 3rd
 
-# Lowered from 50/60 (2026-08-21, found live): the account this pipeline
-# runs against has an 8000 TPM per-request cap, and a real query hitting
-# these old caps genuinely returned 60 chunks (measured: ~7.3K chars of
-# raw evidence text, ~18K chars once serialized as the tool-result JSON
-# the Policy Evidence Agent sends back to Groq) — comfortably enough on
-# its own, combined with the system prompt/tool schema/conversation
-# overhead, to trip a real 413 "Request too large" on the very first LLM
-# call, before any grading even happens. That failure isn't cosmetic: it
-# cascades into clinicalCriteriaEval force-failing every criterion
-# ("upstream policy evidence agent reported an error") and the decision
-# routing to PEND on a false "no policy found," even though real,
-# on-topic evidence was retrieved and simply never got interpreted.
-# 60->60/60*18=~18 total chunks keeps the evidence payload to roughly a
-# third of its old size — comfortably under budget even with the
-# corrective retry in policy_evidence_agent.py added the same day, which
-# re-sends this same payload once more when the LLM's own answer
-# contradicts it. distance-sorted ordering is unchanged, so this only
-# ever trims the LEAST relevant tail of an already-ranked result — the
-# top, most on-topic evidence a query would have surfaced anyway is what
-# survives.
 STAGE2_MAX_CHUNKS_PER_POLICY = 8  # was 50 — still covers a well-structured policy's most relevant sections; a genuinely huge policy's long tail was never the strongest evidence anyway (distance-sorted)
 DEFAULT_MAX_TOTAL_CHUNKS = 18  # was 60 — the real, binding cap on total evidence-payload token cost per LLM call
 
-# Taking a fixed top-N candidate policies alone isn't enough — live-tested
-# and found real noise: for "CPAP therapy for obstructive sleep apnea",
-# rank 3 was AETNA-BARIATRIC-0157 (delta +0.151 from the #1 match) purely
-# because sleep apnea is mentioned there as a bariatric-surgery
-# comorbidity; for "multigene hereditary cancer panel testing", rank 3 was
-# AETNA-SPINAL-CORD-STIM-0194 (delta +0.474) — genuinely unrelated, just
-# closer than the corpus's other unrelated policies. Both would otherwise
-# have contributed up to 50 chunks of pure noise into the Policy Agent's
-# context. A relative margin from the SINGLE best match found filters
-# these correctly: real second/third matches sit within ~0.01-0.04 of the
-# best (e.g. Cigna TKA vs. Aetna knee arthroplasty, delta +0.007), while
-# every observed false positive sits at +0.15 or beyond — even a
-# plausible-seeming adjacent policy (Aetna HIP arthroplasty for a KNEE
-# query, delta +0.173) is correctly excluded, since cross-joint evidence
-# genuinely shouldn't inform a knee-specific decision despite the two
-# policies' similar structure/language. 0.10 sits comfortably in the gap
-# between both classes across all three cases tested.
 STAGE1_RELATIVE_MARGIN = 0.10
 
-# The user-facing explanation for POLICY_EVIDENCE_UNAVAILABLE — this is
-# deliberately framed as a trust feature, not an apology. When this comes up
-# live (and it will — no corpus covers every diagnosis), the honest framing
-# is a differentiator: the system won't fabricate a coverage rule it doesn't
-# actually have, it routes to human review instead. That's the whole point
-# of grounding recommendations in retrieved evidence rather than just asking
-# an LLM "should this be approved?" — see `reason` on the same result for
-# the technical detail (distance/threshold), meant for logs/audit, not for
-# display to a doctor or reviewer.
 POLICY_EVIDENCE_UNAVAILABLE_MESSAGE = (
     "No policy evidence was found that confidently covers this request. "
     "This system does not fabricate a coverage rule it doesn't actually have — "
@@ -191,16 +100,6 @@ def get_plan_payer(plan_id):
         return None
     return PRIVATE_PAYER_GROUP if row[0] == "Private" else row[0]
 
-
-# Cost-share is DISPLAY-ONLY (2026-08-20, explicit instruction): "these
-# should not affect the Agent working or ML scores — these should be as
-# informational in explanation companion agent." Never read by the ML
-# model, coverage_reasoning_agent.py's featureVector, or any gate — wired
-# ONLY into main.py's informational_context, same non-decision-input
-# lane as patient age. A static, non-payer-specific approximation (this
-# system has no real per-plan benefit-design data to ground a precise
-# figure), intentionally not a per-service/per-payer real number, so it's
-# always phrased as an estimate, never cited as if it came from a policy.
 TIER_COST_SHARE_PERCENT = {
     "SILVER": 60,
     "GOLD": 80,
@@ -318,19 +217,11 @@ def retrieve_policy_evidence(query, payer=None, jurisdiction=None, policy_type=N
             }
 
         best_distance = candidate_policies[0][1]
-        # Relative-margin filter — see STAGE1_RELATIVE_MARGIN's comment for
-        # the real false-positive cases this excludes (an unrelated policy
-        # that merely ranked 2nd/3rd-closest among everything else, not a
-        # genuine match for this query).
+
         candidate_policy_ids = [
             row[0] for row in candidate_policies if row[1] <= best_distance + STAGE1_RELATIVE_MARGIN
         ]
 
-        # ─── Stage 2: pull deeply from just those few policies ──────────────
-        # MAX_PER_SECTION still applies defensively (a genuinely under-split
-        # section shouldn't be able to dominate its own policy's budget),
-        # plus a new per-policy cap so ONE huge policy can't crowd out a
-        # smaller-but-still-genuinely-relevant sibling from the same query.
         cur.execute(
             '''WITH scored AS (
                     SELECT p."policyId", p."policyName", pc.section, pc."chunkText",
@@ -380,8 +271,6 @@ def retrieve_policy_evidence(query, payer=None, jurisdiction=None, policy_type=N
         return {
             "policyFound": False,
             "confidence": "LOW",
-            # Still returned for transparency/debugging — callers MUST NOT
-            # treat this as a real answer given policyFound is False.
             "evidence": evidence,
             "message": POLICY_EVIDENCE_UNAVAILABLE_MESSAGE,
             "reason": (

@@ -17,10 +17,7 @@ router.get('/', authenticate, authorize('ADMIN', 'DOCTOR'), async (req, res, nex
 
 router.get('/:id', authenticate, authorize('ADMIN', 'DOCTOR'), async (req, res, next) => {
   try {
-    // Case-insensitive — a doctor typing "pat047" should find the same
-    // record as "PAT047". findByPk() is an exact (case-sensitive) match on
-    // the string primary key, which silently looked like "patient not
-    // found" for any casing other than exactly what's stored.
+
     const patient = await Patient.findOne({ where: { id: { [Op.iLike]: req.params.id.trim() } } });
     if (!patient) {
       return res.status(404).json({ success: false, message: 'Patient not found.' });

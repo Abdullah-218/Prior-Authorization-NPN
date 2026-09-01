@@ -1,15 +1,3 @@
-/**
- * Triage Service Manager
- *
- * Same auto-start-or-reuse pattern as mlServiceManager.js, but for the NEW
- * policy-aware agents+RAG+ML pipeline (ProAuth_AI_ML/policy-rag/main.py) —
- * a separate process/port from the old ML service, which this one does not
- * replace or depend on.
- *
- * If the triage service fails to start or dies, the backend keeps running —
- * triageService.js treats an unreachable triage service as a clear error
- * response rather than crashing the request path.
- */
 import { spawn } from 'child_process';
 import { env } from './env.js';
 

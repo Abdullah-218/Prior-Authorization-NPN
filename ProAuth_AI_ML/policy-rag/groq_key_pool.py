@@ -65,14 +65,6 @@ import httpx
 from dotenv import load_dotenv
 from groq import AuthenticationError, Groq, PermissionDeniedError, RateLimitError
 
-# A key can stop working two different ways: genuinely rate-limited (429 —
-# self-heals at the next daily reset), or dead (401/403 — revoked, deleted,
-# or mistyped; these are personal accounts, not something this project
-# controls, so this is a real possibility, not a hypothetical). Both must
-# rotate to the next key the same way, or a single dead key breaks its own
-# turn in the rotation forever instead of being skipped — found while
-# reasoning through "does this survive a friend revoking their key without
-# a manual fix + redeploy" (2026-08-22), not from a live failure.
 _SKIP_KEY_ERRORS = (RateLimitError, AuthenticationError, PermissionDeniedError)
 
 load_dotenv()
@@ -89,14 +81,7 @@ def _today_str():
 
 
 def _pool_exhausted_error(message):
-    # Every existing Groq call site in this codebase already has an except
-    # block scoped to RateLimitError (either to retry or to degrade
-    # gracefully to a fallback result) — raising a real RateLimitError here
-    # for "every pooled key is exhausted" means those existing handlers
-    # keep working unchanged, instead of an unhandled RuntimeError bypassing
-    # them and crashing the request. The synthetic response/body are never
-    # inspected by any caller in this codebase, only the exception type and
-    # .message are.
+
     fake_response = httpx.Response(429, request=httpx.Request("POST", "https://groq_key_pool.local"))
     return RateLimitError(message, response=fake_response, body=None)
 
@@ -151,12 +136,6 @@ class GroqKeyPool:
         except OSError:
             pass  # persistence is a nice-to-have; rotation still works in-memory this run
 
-    # ---------- rotation ----------
-    # No round-robin counter — the active key is always the lowest-index key
-    # that isn't in `exhausted` yet. Exhausted keys are only ever removed
-    # from that set at the next daily reset, never re-added mid-day, so
-    # this deterministically walks 0, 1, 2, ... as each one gets rate-
-    # limited, with no index arithmetic that can skip or repeat a key.
     def _get_active_client(self):
         with self._lock:
             today = _today_str()
@@ -188,22 +167,13 @@ class GroqKeyPool:
 
     def create_with_rotation(self, **kwargs):
         while True:
-            # Raises RateLimitError itself once no key remains available —
-            # that propagates straight out of this loop (it's outside the
-            # try below), so this never spins forever and never needs a
-            # separate "have I tried them all" counter.
+
             key_index, client = self._get_active_client()
             try:
                 return client.chat.completions.create(**kwargs)
             except RateLimitError:
                 self._mark_exhausted(key_index, "rate-limited (will retry automatically at the next daily reset)")
             except (AuthenticationError, PermissionDeniedError):
-                # A dead key, not a rate limit — waiting for the daily reset
-                # won't fix this one, it'll just fail the same way again
-                # tomorrow. Marked exhausted anyway so THIS run keeps moving
-                # to a working key instead of breaking here; the log line is
-                # the actual signal that this specific key needs replacing
-                # in GROQ_API_KEYS, not just time.
                 self._mark_exhausted(key_index, "REJECTED (invalid/revoked key — needs manual replacement, will not self-heal)")
 
 

@@ -8,16 +8,6 @@ import {
   defineAuthorizationEvaluation,
 } from './models.js';
 
-// Transparent field-level encryption for the clinical-content columns
-// scoped by the encryption plan (2026-08-22) — everything else on this
-// model (patient/provider/insurance identity JSONB, status, createdBy,
-// etc.) is deliberately left plaintext, since it's either non-clinical
-// or needed for row-level access control / reviewer queues. Encrypted
-// value is stored as a JSON *string* inside the JSONB column (Postgres
-// JSONB can hold a bare string) — no column type change needed. Existing
-// rows were migrated in place by scripts/migrateEncryptClinicalData.js
-// BEFORE this getter/setter was added (running it after would have tried
-// to decrypt still-plaintext data).
 function encryptedJsonbField(fieldName) {
   return {
     type: DataTypes.JSONB,
@@ -242,12 +232,6 @@ Notification.belongsTo(User, { foreignKey: 'userId' });
 Authorization.hasMany(AuthorizationEvaluation,  { foreignKey: 'authorizationId' });
 AuthorizationEvaluation.belongsTo(Authorization, { foreignKey: 'authorizationId' });
 
-// Insurance / policy associations. InsurancePlan is deliberately NOT
-// FK-linked to Policy — which policy applies to a given plan is resolved at
-// query time (matching payer/jurisdiction/service against policy_criteria),
-// not a fixed 1:many list declared up front. A real plan can be governed by
-// several policies, and one policy can apply across several plans from the
-// same payer.
 Policy.hasMany(PolicyVersion,   { foreignKey: 'policyId', as: 'versions' });
 PolicyVersion.belongsTo(Policy, { foreignKey: 'policyId' });
 // Explicit alias — Sequelize's auto-pluralizer doesn't know "Criterion" ->
@@ -259,12 +243,7 @@ PolicyChunk.belongsTo(Policy, { foreignKey: 'policyId' });
 PolicyVersion.hasMany(PolicyChunk,   { foreignKey: 'policyVersionId' });
 PolicyChunk.belongsTo(PolicyVersion, { foreignKey: 'policyVersionId' });
 
-// Patient.insurancePlanId stores InsurancePlan.planId (the business key,
-// e.g. "PLAN001") rather than the internal uuid — deliberately, since
-// that's what the frontend dropdown, the API, and the Python agent's
-// get_plan_payer()/evaluate_policy_evidence() already use as the plan
-// identifier everywhere else. targetKey overrides Sequelize's default
-// (which would otherwise assume the FK targets InsurancePlan.id).
+
 InsurancePlan.hasMany(Patient,   { foreignKey: 'insurancePlanId', sourceKey: 'planId' });
 Patient.belongsTo(InsurancePlan, { foreignKey: 'insurancePlanId', targetKey: 'planId' });
 

@@ -1,18 +1,3 @@
-/**
- * Insurance Plan / Policy / RAG models — policy-aware prior-authorization
- * triage schema. Additive alongside the existing rule-engine models in
- * models.js; nothing here removes or alters an existing table.
- *
- * Relationship (per the project's policy-companion design):
- *   InsurancePlan -> Policy -> PolicyVersion -> PolicyCriterion (structured criteria)
- *                                             -> PolicyChunk    (RAG retrieval text)
- *
- * PolicyChunk.embedding is a pgvector column (384-dim, matching the
- * sentence-transformers/all-MiniLM-L6-v2 model chosen for local, free,
- * no-external-API embeddings — see the policy ingestion pipeline). Changing
- * embedding models later means re-embedding every chunk, since dimension
- * and vector space aren't portable across models.
- */
 import { DataTypes } from 'sequelize';
 
 // ─── InsurancePlan ────────────────────────────────────────────────────────────
@@ -25,14 +10,6 @@ export function defineInsurancePlan(sequelize) {
       planName:     { type: DataTypes.STRING, allowNull: false },
       payerName:    { type: DataTypes.STRING, allowNull: false },
       coverageType: { type: DataTypes.STRING, allowNull: true }, // e.g. "Medicare", "Commercial", "Medicaid"
-      // Cost-sharing tier (SILVER | GOLD | PREMIUM), private plans only —
-      // null for Medicare/untiered plans. Deliberately NOT used anywhere in
-      // policy retrieval or agent scoping: which policy applies is scoped
-      // by payerName alone (see retrieval.py's payer filter), because a
-      // payer's medical-necessity criteria for a given service don't
-      // actually vary by tier in the real world — tiers only change
-      // cost-sharing (copay/deductible/coinsurance), which this system
-      // doesn't model. This field exists purely for plan-selection realism.
       tier:         { type: DataTypes.STRING, allowNull: true },
       jurisdiction: { type: DataTypes.STRING, allowNull: true }, // e.g. "US", "US-CA"
       active:       { type: DataTypes.BOOLEAN, defaultValue: true },
@@ -48,8 +25,7 @@ export function defineInsurancePlan(sequelize) {
 }
 
 // ─── Policy ───────────────────────────────────────────────────────────────────
-// source distinguishes where a policy actually came from — never blur these,
-// the companion agent's explanations depend on citing the real source.
+
 export const POLICY_SOURCE = {
   CMS: 'CMS',                             // real CMS NCD/LCD, via api.coverage.cms.gov
   PUBLIC_PAYER_POLICY: 'PUBLIC_PAYER_POLICY', // real, publicly published payer medical policy PDF

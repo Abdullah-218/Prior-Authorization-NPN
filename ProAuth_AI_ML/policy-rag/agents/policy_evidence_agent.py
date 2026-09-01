@@ -1,48 +1,3 @@
-"""
-Policy Evidence Agent
-=======================
-
-The first real agent in this system, and the reference implementation for
-every agent that follows it: genuine Groq tool-calling (tools/tool_choice/
-tool_calls, a real execute-and-respond loop), not text parsing pretending
-to be tool use. Uses a SEPARATE Groq API key (GROQ_AGENT_API_KEY) from the
-Node backend's rule-engine ambiguity resolution (GROQ_API_KEY), so agent
-workloads don't compete with that for rate limit.
-
-Role: identify whether a policy applies to a requested service, and if so,
-extract its coverage criteria — grounded ONLY in what
-retrieve_policy_evidence() actually returns. The agent has no built-in
-policy knowledge and is explicitly instructed not to substitute its own
-medical knowledge when the tool finds nothing.
-
-Policy-type scoping is DETERMINISTIC, not something the LLM is trusted to
-decide: the caller resolves the patient's actual insurance plan to a payer
-(get_plan_payer()) and that payer is hard-injected into every tool call
-this agent makes — the LLM's tool schema doesn't even expose a payer
-parameter, so it has no way to search outside the patient's own plan's
-policies. Without this, a Commercial-plan patient's request could
-silently retrieve a Medicare policy that was never actually theirs to
-begin with — this was a real bug, found and fixed, not a hypothetical.
-
-Loop (per the project's tool-calling spec):
-  1. Send messages + tool definitions to Groq (tool_choice="auto")
-  2. Groq returns tool_calls
-  3. Parse tool name + arguments
-  4. Execute the local tool (retrieve_policy_evidence)
-  5. Append the assistant tool-call message
-  6. Append a role="tool" result, keyed to the tool_call_id
-  7. Send the updated messages back to Groq
-  8. Repeat while more tool_calls are requested
-  9. Stop once Groq returns a final response with no tool_calls
-  Bounded at MAX_ITERATIONS — never an unbounded loop.
-
-Usage:
-    from agents.policy_evidence_agent import evaluate_policy_evidence
-    result = evaluate_policy_evidence(
-        requested_service="CPAP therapy",
-        diagnosis="obstructive sleep apnea",
-    )
-"""
 import json
 import os
 
@@ -132,39 +87,13 @@ requiredDocuments: 2-4 short human-readable names of the specific documents/reco
 
 def _execute_tool_call(tool_call, payer, last_result_holder):
     args = json.loads(tool_call.function.arguments)
-    # payer is never taken from the LLM's tool arguments — the tool schema
-    # doesn't even offer it as a parameter. It's injected here from the
-    # patient's actual resolved plan, deterministically, every call.
-    #
-    # Two-stage retrieval (2026-08-20+ — see rag/retrieval.py's
-    # STAGE1_MAX_CANDIDATE_POLICIES comment for the full history, including
-    # the SUPERSEDED single flat top_k=16 this replaces): a single global
-    # cap on the whole payer-group union let one large, genuinely-relevant
-    # policy crowd out most of its OWN branches (confirmed live: Aetna's
-    # 46-chunk knee-arthroplasty policy alone filled 11 of 16 slots for a
-    # realistic query, leaving ~35 of its own real criteria unreachable).
-    # retrieve_policy_evidence() now finds the right FEW policies first,
-    # then pulls deeply from just those — defaults (no override needed
-    # here) scale cost with what THIS query actually needs rather than
-    # paying a flat token cost on every call, including the common
-    # single-small-policy case that was never broken.
+
     result = retrieve_policy_evidence(args["query"], payer=payer)
-    # Stashed so the caller can derive relevanceScore straight from the raw
-    # cosine distance after the loop ends — deterministically, not by
-    # asking the LLM to echo a number back (same "don't trust the LLM with
-    # a value that's already computable" discipline as every other
-    # deterministic figure in this project).
     last_result_holder["result"] = result
     return json.dumps(result)
 
 
 def _relevance_score_from(last_result_holder):
-    """
-    evidence is already ORDER BY distance ASC (see retrieve_policy_evidence's
-    SQL), so evidence[0] is the single best match found. 1 - distance turns
-    "lower is better" cosine distance into a 0-1 "higher is better" score,
-    matching the slide's "RAG relevance score (0-1)" framing.
-    """
     evidence = (last_result_holder.get("result") or {}).get("evidence") or []
     if not evidence:
         return None
@@ -180,11 +109,7 @@ def _is_valid_json(raw):
 
 
 def _validate_output(raw):
-    """
-    Never trust raw LLM JSON blindly — same principle as groqService.js's
-    validation on the Node side. Falls back to an honest UNKNOWN/NONE
-    result rather than propagating malformed or out-of-schema output.
-    """
+
     try:
         parsed = json.loads(raw)
     except (json.JSONDecodeError, TypeError):
@@ -230,21 +155,6 @@ def _fallback_result(reason):
 
 
 def evaluate_policy_evidence(requested_service, diagnosis, plan_id=None, model=None):
-    """
-    Runs the full tool-calling loop and returns a validated, structured
-    result. Never raises for a "no policy found" outcome — that's a valid,
-    honest result, not an error. Raises only for actual failures (bad API
-    key, network error, exhausted iterations without a final answer).
-
-    plan_id: the patient's insurance_plans.planId (e.g. "PLAN001"). Resolved
-    to a payer BEFORE any Groq call, and that payer is hard-scoped into
-    every retrieval the agent makes — see the module docstring for why this
-    can't be left to the LLM. If plan_id doesn't resolve to a known plan,
-    this deliberately does NOT fall back to an unscoped search across every
-    payer's policies (that would defeat the entire point) — it returns an
-    honest "can't determine applicable payer" result instead, without even
-    spending a Groq call on it.
-    """
     last_tool_result = {}
 
     payer = None
@@ -260,10 +170,6 @@ def evaluate_policy_evidence(requested_service, diagnosis, plan_id=None, model=N
     client = _get_client()
     model = model or os.environ.get("GROQ_AGENT_MODEL", "openai/gpt-oss-120b")
 
-    # payer is a list for a consolidated Private-tier plan (get_plan_payer
-    # expands the "Private" sentinel to PRIVATE_PAYER_GROUP) — the LLM is
-    # never shown WHY it's a list, just the scope, same "deterministic,
-    # not the LLM's call" discipline either way.
     payer_display = ", ".join(payer) if isinstance(payer, (list, tuple)) else payer
     plan_context = f"\nPatient's insurance payer (evidence is scoped to this payer only): {payer_display}" if payer else ""
     messages = [
@@ -275,36 +181,13 @@ def evaluate_policy_evidence(requested_service, diagnosis, plan_id=None, model=N
     ]
 
     tool_already_called = False
-
-    # Whole loop wrapped (2026-08-20 — coordinated Groq resilience, see
-    # docs/PROGRESS_TRACKER.md §9.9): a raw Groq API failure (rate limit,
-    # connection error, transient 5xx — the SDK's own built-in retries
-    # already handle short-lived cases; this catches what's left after
-    # those are exhausted) used to propagate straight out of this
-    # function, out of the LangGraph node, and crash the whole /triage
-    # call as an unhandled 500. Companion Agent and
-    # _llm_judge_contraindication already degrade gracefully this way;
-    # this brings Policy Agent in line with that same pattern instead of
-    # being the odd one out. Degrading here — same _fallback_result shape
-    # as an invalid-JSON or "no policy found" result — means the request
-    # still gets a real, explained decision (the existing policyNotFound
-    # gate fires exactly as it does for any other missing-policy case),
-    # not a crash. Never masks a REAL negative result: only an actual
-    # exception from the API call itself lands here, never a valid
-    # {"policyFound": false, ...} response.
     try:
         for _ in range(MAX_ITERATIONS):
             response = client.chat.completions.create(
                 model=model,
                 messages=messages,
                 tools=TOOLS,
-                # Forced to "none" once the real tool has already run — some
-                # models, when instructed to output JSON while tools are still
-                # offered, try to emit the final answer AS a tool call (e.g. a
-                # phantom "JSON" function that isn't in TOOLS), which the API
-                # rejects. This agent only ever needs one retrieval round, so
-                # forcing plain content on the follow-up turn is correct here,
-                # not just a workaround.
+
                 tool_choice="auto" if not tool_already_called else "none",
                 temperature=0.1,
             )
@@ -313,18 +196,6 @@ def evaluate_policy_evidence(requested_service, diagnosis, plan_id=None, model=N
             if not message.tool_calls:
                 content = message.content
                 if not _is_valid_json(content):
-                    # One deterministic retry before falling back to "no policy
-                    # found" (item #39, found live 2026-08-20 — see
-                    # docs/PROGRESS_TRACKER.md §9.5): Groq occasionally returns
-                    # malformed JSON on the first attempt, and without a retry
-                    # that single glitch was indistinguishable from a genuine
-                    # negative result — a real, applicable policy (Aetna PT,
-                    # CPB 0325) got reported as not found for a reason that had
-                    # nothing to do with actual coverage. Same messages,
-                    # temperature=0 for the retry (more deterministic than the
-                    # original 0.1). Never retries a real result: a
-                    # syntactically valid {"policyFound": false, ...} response
-                    # is not "invalid JSON" and returns immediately above.
                     retry_response = client.chat.completions.create(
                         model=model,
                         messages=messages,
@@ -337,22 +208,6 @@ def evaluate_policy_evidence(requested_service, diagnosis, plan_id=None, model=N
                 parsed = _validate_output(content)
                 tool_result = last_tool_result.get("result") or {}
                 tool_policy_found = bool(tool_result.get("policyFound"))
-
-                # Found live (2026-08-21): a literal, unambiguous match — the
-                # tool's top evidence chunk was NCD-240.1's own "Item/Service
-                # Description" defining Lung Volume Reduction Surgery, for a
-                # direct LVRS request, at MEDIUM confidence — still got
-                # reported as policyFound: false in the LLM's final answer.
-                # retrieve_policy_evidence() already makes this decision
-                # deterministically from real cosine distance (see its own
-                # HIGH/MEDIUM/LOW gating) — it is not the LLM's to re-judge,
-                # per the system prompt's rule above. When the LLM's answer
-                # contradicts what its own tool call actually returned, give
-                # it ONE corrective retry — explicitly telling it the tool
-                # already confirmed a match — so it gets a real chance to
-                # extract real criteria from real evidence instead of
-                # silently discarding it. Same "one more chance before
-                # falling back" precedent as the invalid-JSON retry above.
                 if tool_policy_found and not parsed["policyFound"]:
                     correction = (
                         f"Your answer reported policyFound: false, but the retrieve_policy_evidence "
@@ -376,27 +231,9 @@ def evaluate_policy_evidence(requested_service, diagnosis, plan_id=None, model=N
                         retry_content = retry_response.choices[0].message.content
                         if _is_valid_json(retry_content):
                             parsed = _validate_output(retry_content)
-                    except Exception:  # noqa: BLE001 - genuine API failure, not a validation case
-                        # The corrective retry re-sends the full evidence
-                        # payload plus the correction message, which can push
-                        # a request over a constrained account's per-request
-                        # token cap (found live 2026-08-21: a real 413 "request
-                        # too large" on an 8000 TPM tier). That failure must
-                        # NOT propagate to the outer handler's pessimistic
-                        # _fallback_result, which would silently discard the
-                        # tool_policy_found=True fact already confirmed above
-                        # — keep the original (uncorrected) extraction; the
-                        # hard backstop below still forces policyFound/
-                        # confidence correctly either way.
+                    except Exception:  
                         pass
 
-                # policyFound/confidence are never left to the LLM's final
-                # say either way, regardless of the retry's outcome — same
-                # "don't trust the LLM with a value that's already
-                # deterministically computable" discipline as
-                # relevanceScore below. This is a hard backstop: even if the
-                # LLM stubbornly repeats a contradicting answer, the tool's
-                # own real result wins.
                 parsed["policyFound"] = tool_policy_found
                 if tool_result.get("confidence"):
                     parsed["confidence"] = tool_result["confidence"]
@@ -438,7 +275,7 @@ def evaluate_policy_evidence(requested_service, diagnosis, plan_id=None, model=N
             "planId": plan_id,
             "payerScope": payer,
         }
-    except Exception as exc:  # noqa: BLE001 - genuine network/API failure (rate limit, connection error, etc.), not a validation case
+    except Exception as exc:
         return {
             **_fallback_result(f"Groq API call failed: {exc}"),
             "relevanceScore": _relevance_score_from(last_tool_result),
